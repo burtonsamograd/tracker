@@ -1,0 +1,76 @@
+* {
+    font-family: monospace;
+    font-weight: bold;
+    padding: 0px;
+    margin: 0px;
+}
+
+
+input[type=text] {
+    border: 0px;
+    background-color: yellow;
+    font-size: inherit;
+    padding: 0px;
+    margin: 0px;
+}
+
+.NoteValueEditView .ChannelValueEditView 
+{
+    max-width: 2em;
+    display: inline-block;
+}
+
+.ChannelNameEditView {
+    max-width: 8em;
+}
+
+.ChannelNameView {
+    width: 5em;
+    text-align: center;
+}
+
+.ChannelGainView {
+    display: inline-block;
+    text-align: center;
+    width: 1.5em;
+}
+
+.ChannelPanView {
+    display: inline-block;
+    text-align: center;
+    width: 1.5em;
+}
+
+.ChannelView {
+    border: 1px solid;
+    padding: .5em;
+    width: 5em;
+    display: inline-block;
+}
+
+.PatternView {
+    border: 1px dotted;
+    overflow: auto;
+    white-space: nowrap;
+}
+
+
+.Button {
+    padding-right: .25em;
+    padding-left: .25em;
+    text-align: center;
+    display: inline-block;
+}
+
+.ButtonEnabled {
+    background-color: red;
+}
+
+.ButtonDisabled {
+    background-color: transparent;
+}
+
+.ChannelSelected {
+    background-color: red;
+}
+

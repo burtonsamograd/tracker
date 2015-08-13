@@ -1,0 +1,126 @@
+;; -*- mode: lisp -*-
+
+(defview *Channel-value-edit-view
+    tag-name "input type='text' maxlength='2' size='2'"
+    model 'note
+    init (lambda (model model-value-fn)
+           (setf (@ this model-value-fn) model-value-fn)
+           (this.$el.val ((@ model-value-fn call) this.note)))
+    events (create
+            :keypress (lambda (e)
+                        (if (= (@ e key-code) 13)
+                            (this.finished)))
+            :blur (lambda (e)
+                      (this.finished)))
+    finished (lambda ()
+               ((@ this model-value-fn call) this.note (this.$el.val))
+               (this.trigger :end-edit this)))
+
+(defview *Channel-solo-button-view
+    model 'channel
+    events (create
+            :click (lambda (e)
+                     (this.channel.solo (not (this.channel.solo)))
+                     (this.render)))
+    render (lambda ()
+             (if (this.channel.solo)
+                 (this.$el.attr 'class "Button ButtonEnabled")
+                 (this.$el.attr 'class "Button ButtonDisabled"))
+             (this.$el.text "S")))
+
+(defview *Channel-mute-button-view
+    model 'channel
+    events (create
+            :click (lambda (e)
+                     (this.channel.mute (not (this.channel.mute)))
+                     (this.render)))
+    render (lambda ()
+             (if (this.channel.mute)
+                 (this.$el.attr 'class "Button ButtonEnabled")
+                 (this.$el.attr 'class "Button ButtonDisabled"))
+             (this.$el.text "M")))
+
+(defview *Channel-gain-view
+    model 'channel
+    render (lambda ()
+             (this.$el.text ((@ (this.channel.gain) to-string) 16))))
+
+(defview *Channel-pan-view
+    model 'channel
+    render (lambda ()
+             (this.$el.text ((@ (this.channel.pan) to-string) 16))))
+
+(defview *Channel-controls-view
+    model 'channel
+    init (lambda (model)
+           (this.create 'solo-button (new (*View *Channel-solo-button-view this.channel)))
+           (this.create 'mute-button (new (*View *Channel-mute-button-view this.channel)))
+           (this.create 'gain-view (new (*View *Channel-gain-view this.channel)))
+           (this.create 'pan-view (new (*View *Channel-pan-view this.channel))))
+    render (lambda ()
+             (let ((html (array
+                          ((@ ((@ this gain-view)) render))
+                          ((@ ((@ this solo-button)) render))
+                          ((@ ((@ this mute-button)) render))
+                          ((@ ((@ this pan-view)) render))
+                     )))
+               (this.$el.html html))))
+
+(defview *Channel-name-edit-view
+    tag-name "input type='text' size='8'"
+    model 'channel
+    init (lambda (model model-value-fn)
+           (setf (@ this model-value-fn) model-value-fn)
+           (this.$el.val ((@ model-value-fn call) this.note)))
+    events (create
+            :keypress (lambda (e)
+                        (if (= (@ e key-code) 13)
+                            (this.finished)))
+            :blur (lambda (e)
+                      (this.finished)))
+    finished (lambda ()
+               ((@ this model-value-fn call) this.note
+                (or (this.$el.val) (this.channel.index)))
+               (this.trigger :end-edit-name this)))
+
+(defview *Channel-name-view
+    model 'channel
+    events (create
+            'click (lambda (e)
+                     (this.trigger :edit-name)))
+    render (lambda ()
+             (this.$el.text (this.channel.name))))
+
+(defview *Channel-view
+    model 'channel
+    events (create
+            'click (lambda (e)
+                     (this.trigger :channel-select this)))
+
+    init (lambda (model)
+           (this.create 'name-view (new (*View *Channel-name-view this.channel)))
+           (this.create 'controls-view (new (*View *Channel-controls-view this.channel)))
+           (this.create 'selected f)
+           (this.on :edit-name (lambda (e)
+                                 ((@ this name-view)
+                                  (new (*View *Channel-name-edit-view
+                                              this.channel
+                                              this.channel.name)))
+                                 (this.render)
+                                 ((@ (@ ((@ this name-view)) $el) focus))
+                                 ))
+           (this.on :end-edit-name (lambda (e)
+                                     ((@ this name-view)
+                                      (new (*View *Channel-name-view
+                                                  this.channel)))
+                                     (this.render)))
+           (this.on "change:selected" (lambda (e)
+                                        ((@ this $el toggle-class) "ChannelSelected"))))
+    render (lambda ()
+             (let ((html (this.channel.map
+                             (lambda (note)
+                               ((@ (new (*View *Note-view note)) render))))))
+               ((@ html unshift) ((@ ((@ this controls-view)) render)))
+               ((@ html unshift) ((@ ((@ this name-view)) render)))
+               (this.$el.html html))))
+

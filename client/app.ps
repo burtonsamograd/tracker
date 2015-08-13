@@ -1,0 +1,68 @@
+;; -*- mode: lisp -*-
+(load "macros.ps")
+
+(defvar default-num-channels 12)
+(defvar default-pattern-length 32)
+
+(defmodel *Note
+    init (lambda (instrument pitch fx)
+           (this.create :instrument instrument)
+           (this.create :pitch pitch)
+           (this.create :fx fx)
+           ))
+
+(defcontainer *Channel *Note
+  init (lambda (index name size)
+         (this.create :size (or size default-pattern-length))
+         (this.create :index index)
+         (this.create :name (or name index))
+         (this.create :gain 128)
+         (this.create :pan 128)
+         (this.create :mute f)
+         (this.create :solo f)
+
+         (dotimes (i (this.size))
+           (this.add (new (*Class *Note))))))
+
+(defcontainer *Pattern *Channel
+  init (lambda (index name size)
+         (this.create :size (or size default-pattern-length))
+         (this.create :index index)
+         (this.create :name (or name index))
+         (dotimes (i (this.size))
+           (this.add (new (*Class *Channel i))))))
+
+(defcontainer *Song *Pattern
+  init (lambda (name name)
+         (this.create :size (or size default-pattern-length))
+         (this.create :name (or name index))))
+
+(load "note-view.ps")
+(load "channel-view.ps")
+
+(defview *Pattern-view
+    model "pattern"
+    contains "ChannelView"
+    init (lambda ()
+           (this.pattern.on :add this.render this)
+           (this.pattern.each (lambda (channel)
+                                (this.add (new (*View *Channel-view channel)))) this)
+           (this.create 'current-channel-view (this.at 0))
+           ((@ (this.at 0) selected) t)
+           (this.on :channel-select (lambda (e)
+                                      ((@ ((@ this current-channel-view)) selected) f)
+                                      ((@ this current-channel-view) e.value)
+                                      ((@ ((@ this current-channel-view)) selected) t))))
+    render (lambda ()
+             (this.$el.html (this.map
+                             (lambda (channel-view)
+                               ((@ channel-view render)))))))
+
+((@ ($ document) ready)
+ (lambda ()
+   (let* ((note (new (*Class *Note)))
+          (pattern (new (*Class *Pattern 0)))
+          (note-view (new (*View *Note-view note)))
+          (pattern-view (new (*View *Pattern-view pattern))))
+     ((@ ($ 'body) html) ((@ pattern-view render))))))
+   

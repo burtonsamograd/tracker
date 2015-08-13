@@ -1,0 +1,99 @@
+;; -*- mode: lisp -*-
+
+(defview *Note-pitch-view
+    tag-name :span
+    model 'note
+    events (create
+            'click (lambda (e)
+                     (this.trigger :edit this)))
+
+    init (lambda (model)
+           (this.note.on :change this.render this))
+    render (lambda ()
+             (this.$el.text (or (this.note.pitch) "--"))
+             ))
+
+(defview *Note-fx-view
+    tag-name :span
+    model 'note
+    events (create
+            'click (lambda (e)
+                     (this.trigger :edit this)))
+    init (lambda (model)
+           (this.note.on :change this.render this))
+    render (lambda ()
+             (this.$el.text (or (this.note.fx) "--"))
+             ))
+
+(defview *Note-instrument-view
+    tag-name :span
+    model 'note
+    events (create
+            'click (lambda (e)
+                     (this.trigger :edit this)))
+    init (lambda (model)
+           (this.note.on :change this.render this))
+    render (lambda ()
+             (this.$el.text (or (this.note.instrument) "--"))
+             ))
+
+(defview *Note-value-edit-view
+    tag-name "input type='text' maxlength='2' size='2'"
+    model 'note
+    init (lambda (model model-value-fn)
+           (setf (@ this model-value-fn) model-value-fn)
+           (this.$el.val ((@ model-value-fn call) this.note)))
+    events (create
+            :keypress (lambda (e)
+                        (if (= (@ e key-code) 13)
+                            (this.finished)))
+            :blur (lambda (e)
+                      (this.finished)))
+    finished (lambda ()
+               ((@ this model-value-fn call) this.note (this.$el.val))
+               (this.trigger :end-edit this)))
+
+(defview *Note-view
+    model 'note
+    init (lambda (model)
+           (this.create 'pitch-view (new (*View *Note-pitch-view this.note)))
+           (this.create 'fx-view (new (*View *Note-fx-view this.note)))
+           (this.create 'instrument-view (new (*View *Note-instrument-view this.note)))
+
+           (this.on :edit
+                    (lambda (e)
+                      (let (el)
+                      (cond 
+                        ((= ((@ this pitch-view)) e.value)
+                         ((@ this pitch-view)
+                          (setf el (new (*View *Note-value-edit-view this.note this.note.pitch)))))
+                        ((= ((@ this fx-view)) e.value)
+                         ((@ this fx-view)
+                          (setf el (new (*View *Note-value-edit-view this.note this.note.fx)))))
+                        ((= ((@ this instrument-view)) e.value)
+                         ((@ this instrument-view)
+                          (setf el (new (*View *Note-value-edit-view this.note this.note.instrument))))))
+                      (this.render)
+                      ((@ (@ el $el) focus)))))
+                            
+           (this.on :end-edit
+                    (lambda (e)
+                      (cond
+                        ((= ((@ this pitch-view)) e.value)
+                         ((@ this pitch-view) 
+                          (new (*View *Note-pitch-view this.note))))
+                        ((= ((@ this fx-view)) e.value)
+                         ((@ this fx-view) 
+                          (new (*View *Note-fx-view this.note))))
+                        ((= ((@ this instrument-view)) e.value)
+                         ((@ this instrument-view) 
+                          (new (*View *Note-instrument-view this.note)))))
+                      (this.render)))
+           )
+    render (lambda ()            
+             (this.$el.html (array
+                             ((@ ((@ this pitch-view)) render))
+                             "&nbsp;"
+                             ((@ ((@ this fx-view)) render))
+                             "&nbsp;"
+                             ((@ ((@ this instrument-view)) render))))))

@@ -1,0 +1,21 @@
+;; -*- mode: lisp -*-
+
+(defmacro defmodel (name &rest body)
+  `(defvar ,name
+     (create
+      type ',name
+      ,@body)))
+
+(defmacro defcontainer (name contains &rest body)
+  `(defvar ,name
+     (create
+      type ',name
+      contains ',contains
+      ,@body)))
+
+(defmacro defview (name &rest body)
+  `(defvar ,name
+     (create
+      type ',name
+      ,@body)))
+
