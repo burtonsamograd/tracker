@@ -29,7 +29,7 @@ function Event(target, value) {
                          ((@ THIS CREATE) DEF
                           (GETPROP OPTIONS 'DEFAULTS DEF))))
              (FOR-IN (K OPTIONS) (SETF (GETPROP THIS K) (GETPROP OPTIONS K)))
-             (SETF THIS.LENGTH 0)
+             (SETF THIS.LENGTH 0) (SETF THIS.OPTIONS OPTIONS)
              (IF (@ THIS INIT)
                  (LET ((ARGS ((@ *ARRAY PROTOTYPE SLICE CALL) ARGUMENTS 1)))
                    ((@ THIS INIT APPLY) THIS ARGS)))) */
@@ -47,6 +47,7 @@ function Class(options) {
         this[k] = options[k];
     };
     this.length = 0;
+    this.options = options;
     if (this.init) {
         var args = Array.prototype.slice.call(arguments, 1);
         this.init.apply(this, args);
@@ -71,6 +72,42 @@ function addParent(child, parent, name) {
             return child._parents.remove(e.target);
         });
     };
+};
+/* (DEFMETHOD *CLASS COPY ()
+     (LET ((OBJ (NEW (*CLASS THIS.OPTIONS))))
+       (FOR-IN (PROP THIS._PROPS) (OBJ.DESTROY PROP T)
+               (LET ((THIS-PROP (GETPROP THIS '_PROPS PROP)))
+                 (IF (*CLASSP THIS-PROP)
+                     (OBJ.CREATE PROP ((@ (GETPROP THIS '_PROPS PROP) COPY)))
+                     (OBJ.CREATE PROP
+                      (IF (OR ((@ *ARRAY IS-ARRAY) THIS-PROP)
+                              (= (TYPEOF THIS-PROP) 'OBJECT))
+                          ((@ *JSON* PARSE) ((@ *JSON* STRINGIFY) THIS-PROP))
+                          THIS-PROP)))))
+       (SETF (@ OBJ _STORAGE)
+               (THIS.MAP
+                (LAMBDA (E)
+                  (IF (*CLASSP E)
+                      ((@ E COPY))
+                      ((@ *JSON* PARSE) ((@ *JSON* STRINGIFY) E))))))
+       (SETF (@ OBJ LENGTH) (@ OBJ _STORAGE LENGTH))
+       OBJ)) */
+Class.prototype.copy = function () {
+    var obj = new Class(this.options);
+    for (var prop in this._props) {
+        obj.destroy(prop, true);
+        var thisProp = this._props[prop];
+        if (Classp(thisProp)) {
+            obj.create(prop, this._props[prop].copy());
+        } else {
+            obj.create(prop, Array.isArray(thisProp) || typeof thisProp === 'object' ? JSON.parse(JSON.stringify(thisProp)) : thisProp);
+        };
+    };
+    obj._storage = this.map(function (e) {
+        return Classp(e) ? e.copy() : JSON.parse(JSON.stringify(e));
+    });
+    obj.length = obj._storage.length;
+    return obj;
 };
 /* (DEFMETHOD *CLASS GET (NAME SILENT)
      (IF (NOT ((@ THIS _PROPS HAS-OWN-PROPERTY) NAME))
@@ -160,7 +197,7 @@ Class.prototype.destroy = function (name) {
            (LET ((EVENT (NEW (*EVENT (OR TARGET THIS) VALUE)))
                  (TO-REMOVE (ARRAY)))
              (DOLIST (ACTION ACTIONS)
-               (WHEN ((@ ACTION FUN CALL) (@ ACTION SELF) EVENT)
+               (WHEN (= ((@ ACTION FUN CALL) (@ ACTION SELF) EVENT) T)
                  (SETF TRIGGER-PARENTS T))
                (IF (@ ACTION ONCE)
                    ((@ TO-REMOVE PUSH) ACTION)))
@@ -171,7 +208,6 @@ Class.prototype.destroy = function (name) {
            (UNLESS (= PARENT TARGET)
              ((@ THIS TRIGGER CALL) PARENT MESSAGE VALUE (OR TARGET THIS))))))) */
 Class.prototype.trigger = function (message, value, target) {
-    console.log(message);
     var actions = this._actions[message];
     var triggerParents = null;
     if (actions) {
@@ -179,7 +215,7 @@ Class.prototype.trigger = function (message, value, target) {
         var toRemove = [];
         for (var action = null, _js_idx2 = 0; _js_idx2 < actions.length; _js_idx2 += 1) {
             action = actions[_js_idx2];
-            if (action.fun.call(action.self, event)) {
+            if (action.fun.call(action.self, event) === true) {
                 triggerParents = true;
             };
             if (action.once) {
@@ -246,23 +282,23 @@ Class.prototype.once = function (message, fun, self) {
               (*ERROR
                (+ Attempt to push  (@ OBJ TYPE) into container for
                   (@ THIS CONTAINS))))))
-     (WHEN (*CLASSP OBJ SILENT) ((@ OBJ _PARENTS PUSH) THIS))
+     (WHEN (*CLASSP OBJ) ((@ OBJ _PARENTS PUSH) THIS))
      ((@ THIS _STORAGE PUSH) OBJ)
      (SETF (@ THIS LENGTH) (@ THIS _STORAGE LENGTH))
-     (UNLESS SILENT (TRIGGER THIS ADD OBJ CHANGE OBJ))
+     (UNLESS SILENT (TRIGGER THIS ADD OBJ MODIFIED (ARRAY OBJ)))
      OBJ) */
 Class.prototype.push = function (obj, silent) {
     if (this.contains && obj.type !== this.contains) {
         throw new Error('Attempt to push ' + obj.type + 'into container for ' + this.contains);
     };
-    if (Classp(obj, silent)) {
+    if (Classp(obj)) {
         obj._parents.push(this);
     };
     this._storage.push(obj);
     this.length = this._storage.length;
     if (!silent) {
         this.trigger('add', obj);
-        this.trigger('change', obj);
+        this.trigger('modified', [obj]);
     };
     return obj;
 };
@@ -284,11 +320,45 @@ Class.prototype.add = function (obj, silent) {
     };
     return obj;
 };
+/* (DEFMETHOD *CLASS INSERT-AT (I OBJ SILENT)
+     ((@ (@ THIS _STORAGE) SPLICE) I 0 OBJ)
+     (INCF THIS.LENGTH)
+     (WHEN (*CLASSP OBJ) ((@ OBJ _PARENTS PUSH) THIS))
+     (UNLESS SILENT (TRIGGER THIS ADD OBJ MODIFIED (ARRAY OBJ)))
+     OBJ) */
+Class.prototype.insertAt = function (i, obj, silent) {
+    this._storage.splice(i, 0, obj);
+    ++this.length;
+    if (Classp(obj)) {
+        obj._parents.push(this);
+    };
+    if (!silent) {
+        this.trigger('add', obj);
+        this.trigger('modified', [obj]);
+    };
+    return obj;
+};
+/* (DEFMETHOD *CLASS SWAP (I J SILENT)
+     (LET ((A (THIS.AT I)) (B (THIS.AT J)))
+       (SETF THIS._STORAGE[I] B
+             THIS._STORAGE[J] A)
+       (UNLESS SILENT (TRIGGER THIS MODIFIED (ARRAY A B)))
+       T)) */
+Class.prototype.swap = function (i, j, silent) {
+    var a = this.at(i);
+    var b = this.at(j);
+    this._storage[i] = b;
+    this._storage[j] = a;
+    if (!silent) {
+        this.trigger('modified', [a, b]);
+    };
+    return true;
+};
 /* (DEFMETHOD *CLASS REMOVE (OBJ SILENT)
      (LET ((RETVAL ((@ THIS _STORAGE REMOVE) OBJ)))
        (WHEN RETVAL
          (DECF (@ THIS LENGTH))
-         (UNLESS SILENT (TRIGGER THIS REMOVE OBJ CHANGE OBJ)))
+         (UNLESS SILENT (TRIGGER THIS REMOVE OBJ MODIFIED (ARRAY OBJ))))
        RETVAL)) */
 Class.prototype.remove = function (obj, silent) {
     var retval = this._storage.remove(obj);
@@ -296,36 +366,48 @@ Class.prototype.remove = function (obj, silent) {
         --this.length;
         if (!silent) {
             this.trigger('remove', obj);
-            this.trigger('change', obj);
+            this.trigger('modified', [obj]);
         };
     };
     return retval;
 };
 /* (DEFMETHOD *CLASS CLEAR (SILENT)
-     (SETF (@ THIS _STORAGE) (ARRAY)
-           (@ THIS LENGTH) 0)
-     (UNLESS SILENT (TRIGGER THIS CLEAR THIS CHANGE))) */
+     (LET ((OLD-STORAGE (@ THIS _STORAGE)))
+       (SETF (@ THIS _STORAGE) (ARRAY)
+             (@ THIS LENGTH) 0)
+       (UNLESS SILENT (TRIGGER THIS CLEAR THIS MODIFIED OLD-STORAGE)))) */
 Class.prototype.clear = function (silent) {
+    var oldStorage = this._storage;
     this._storage = [];
     this.length = 0;
     if (!silent) {
         this.trigger('clear', this);
-        return this.trigger('change', null);
+        return this.trigger('modified', oldStorage);
     };
 };
 /* (DEFMETHOD *CLASS AT (INDEX)
      (WHEN (>= INDEX (@ THIS LENGTH))
        (THROW
            (NEW
-            (ERROR
+            (*ERROR
              (+ attempt to index ( INDEX ) out of range of object (
                 (@ THIS LENGTH) ))))))
      (AREF (@ THIS _STORAGE) INDEX)) */
 Class.prototype.at = function (index) {
     if (index >= this.length) {
-        throw new error('attempt to index (' + index + ') out of range of object (' + this.length + ')');
+        throw new Error('attempt to index (' + index + ') out of range of object (' + this.length + ')');
     };
     return this._storage[index];
+};
+/* (DEFMETHOD *CLASS INDEX-OF (OBJ)
+     (LET ((I -1))
+       (AND (THIS.FIND (LAMBDA (IT) (INCF I) (= IT OBJ))) I))) */
+Class.prototype.indexOf = function (obj) {
+    var i = -1;
+    return this.find(function (it) {
+        ++i;
+        return it === obj;
+    }) && i;
 };
 /* (DEFMETHOD *CLASS EACH (FUN SELF)
      (LET ((SELF (OR SELF THIS)))
@@ -367,17 +449,18 @@ Class.prototype.filter = function (fun, self) {
     };
     return result;
 };
-/* (DEFMETHOD *CLASS FIND (FUN-OR-OBJ)
+/* (DEFMETHOD *CLASS FIND (FUN-OR-OBJ SELF)
      (IF (= (TYPEOF FUN-OR-OBJ) FUNCTION)
          (DOLIST (ITEM (@ THIS _STORAGE))
-           (WHEN (FUN-OR-OBJ ITEM) (RETURN-FROM FIND ITEM)))
+           (WHEN ((@ FUN-OR-OBJ CALL) (OR SELF THIS) ITEM)
+             (RETURN-FROM FIND ITEM)))
          (DOLIST (ITEM (@ THIS _STORAGE))
            (WHEN (= FUN-OR-OBJ ITEM) (RETURN-FROM FIND ITEM))))) */
-Class.prototype.find = function (funOrObj) {
+Class.prototype.find = function (funOrObj, self) {
     if (typeof funOrObj === 'function') {
         for (var item = null, _js_arrvar20 = this._storage, _js_idx19 = 0; _js_idx19 < _js_arrvar20.length; _js_idx19 += 1) {
             item = _js_arrvar20[_js_idx19];
-            if (funOrObj(item)) {
+            if (funOrObj.call(self || this, item)) {
                 return item;
             };
         };
@@ -392,13 +475,12 @@ Class.prototype.find = function (funOrObj) {
 };
 /* (DEFMETHOD *CLASS SORT (FUN SILENT)
      ((@ THIS _STORAGE SORT) FUN)
-     (UNLESS SILENT (TRIGGER THIS CHANGE THIS SORTED THIS))
+     (UNLESS SILENT (TRIGGER THIS MODIFIED (@ THIS _STORAGE)))
      THIS) */
 Class.prototype.sort = function (fun, silent) {
     this._storage.sort(fun);
     if (!silent) {
-        this.trigger('change', this);
-        this.trigger('sorted', this);
+        this.trigger('modified', this._storage);
     };
     return this;
 };

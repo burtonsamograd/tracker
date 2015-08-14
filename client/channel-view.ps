@@ -1,20 +1,74 @@
 ;; -*- mode: lisp -*-
 
-(defview *Channel-value-edit-view
-    tag-name "input type='text' maxlength='2' size='2'"
-    model 'note
-    init (lambda (model model-value-fn)
-           (setf (@ this model-value-fn) model-value-fn)
-           (this.$el.val ((@ model-value-fn call) this.note)))
+(defview *Channel-move-left-button-view
+    model 'channel
+    class-name "TinyButton"
     events (create
-            :keypress (lambda (e)
-                        (if (= (@ e key-code) 13)
-                            (this.finished)))
-            :blur (lambda (e)
-                      (this.finished)))
-    finished (lambda ()
-               ((@ this model-value-fn call) this.note (this.$el.val))
-               (this.trigger :end-edit this)))
+            'click (lambda (e)
+                     (this.channel.trigger :move-channel-left this.channel)))
+    render (lambda ()
+             (this.$el.html "←")))
+
+(defview *Channel-move-right-button-view
+    model 'channel
+    class-name "TinyButton"
+    events (create
+            'click (lambda (e)
+                     (this.channel.trigger :move-channel-right this.channel)))
+    render (lambda ()
+             (this.$el.html "→")))
+
+(defview *Channel-add-button-view
+    model 'channel
+    class-name "TinyButton"
+    events (create
+            'click (lambda (e)
+                     (this.channel.trigger :add-channel this.channel)))
+    render (lambda ()
+             (this.$el.html "+")))
+
+(defview *Channel-copy-button-view
+    model 'channel
+    class-name "TinyButton"
+    events (create
+            'click (lambda (e)
+                     (this.channel.trigger :copy-channel this.channel)))
+    render (lambda ()
+             (this.$el.html "⎘")))
+
+(defview *Channel-close-button-view
+    model 'channel
+    class-name "TinyButton ChannelCloseButton"
+    events (create
+            'click (lambda (e)
+                     (when (confirm "Are you sure you want to delete this channel?")
+                       (this.channel.trigger :close-channel this.channel))))
+    render (lambda ()
+             (this.$el.html "✗")))
+
+(defview *Channel-monitor-view
+    model 'channel
+    events (create
+            'click (lambda (e)
+                     (alert :click))))
+
+(defview *Channel-title-view
+    model 'channel
+    init (lambda (model)
+           (this.create 'left-button (new (*View *Channel-move-left-button-view model)))
+           (this.create 'right-button (new (*View *Channel-move-right-button-view model)))
+           (this.create 'close-button (new (*View *Channel-close-button-view model)))
+           (this.create 'add-button (new (*View *Channel-add-button-view model)))
+           (this.create 'copy-button (new (*View *Channel-copy-button-view model))))
+    render (lambda ()
+             (let ((html (array
+                          ((@ ((@ this left-button)) render))
+                          ((@ ((@ this right-button)) render))
+                          ((@ ((@ this add-button)) render))
+                          ((@ ((@ this copy-button)) render))
+                          ((@ ((@ this close-button)) render))
+                     )))
+               (this.$el.html html))))
 
 (defview *Channel-solo-button-view
     model 'channel
@@ -42,13 +96,19 @@
 
 (defview *Channel-gain-view
     model 'channel
+    events (create
+            'click (lambda (e)
+                     (this.trigger :edit this)))
     render (lambda ()
-             (this.$el.text ((@ (this.channel.gain) to-string) 16))))
+             (this.$el.text (hex (this.channel.gain)))))
 
 (defview *Channel-pan-view
     model 'channel
+    events (create
+            'click (lambda (e)
+                     (this.trigger :edit this)))
     render (lambda ()
-             (this.$el.text ((@ (this.channel.pan) to-string) 16))))
+             (this.$el.text (hex (this.channel.pan)))))
 
 (defview *Channel-controls-view
     model 'channel
@@ -56,7 +116,37 @@
            (this.create 'solo-button (new (*View *Channel-solo-button-view this.channel)))
            (this.create 'mute-button (new (*View *Channel-mute-button-view this.channel)))
            (this.create 'gain-view (new (*View *Channel-gain-view this.channel)))
-           (this.create 'pan-view (new (*View *Channel-pan-view this.channel))))
+           (this.create 'pan-view (new (*View *Channel-pan-view this.channel)))
+
+           (this.on :edit (lambda (e)
+                            (let (view)
+                              (cond
+                                ((= ((@ this gain-view)) e.value)
+                                 (setf view
+                                       (new (*View *Two-character-hex-value-edit-view this.channel
+                                            this.channel.gain)))
+                               ((@ this gain-view) view))
+                              ((= ((@ this pan-view)) e.value)
+                                 (setf view
+                                       (new (*View *Two-character-hex-value-edit-view this.channel
+                                            this.channel.pan)))
+                               ((@ this pan-view) view)))
+                              (this.render)
+                              (view.$el.focus)
+                              (view.$el.select)
+                              )))
+
+           (this.on :end-edit (lambda (e)
+                                (cond
+                                  ((= ((@ this gain-view)) e.value)
+                                   ((@ this gain-view)
+                                    (new (*View *Channel-gain-view this.channel))))
+                                  ((= ((@ this pan-view)) e.value)
+                                   ((@ this pan-view)
+                                    (new (*View *Channel-pan-view this.channel)))))
+                                (this.render))))
+                         
+    
     render (lambda ()
              (let ((html (array
                           ((@ ((@ this gain-view)) render))
@@ -94,12 +184,17 @@
 (defview *Channel-view
     model 'channel
     events (create
+            'mousedown (lambda (e)
+                         ((@ e prevent-default)))
             'click (lambda (e)
+                     ((@ e prevent-default))
                      (this.trigger :channel-select this)))
 
     init (lambda (model)
+           (this.create 'title-view (new (*View *Channel-title-view this.channel)))
            (this.create 'name-view (new (*View *Channel-name-view this.channel)))
            (this.create 'controls-view (new (*View *Channel-controls-view this.channel)))
+           (this.create 'monitor-view (new (*View *Channel-monitor-view)))
            (this.create 'selected f)
            (this.on :edit-name (lambda (e)
                                  ((@ this name-view)
@@ -108,6 +203,7 @@
                                               this.channel.name)))
                                  (this.render)
                                  ((@ (@ ((@ this name-view)) $el) focus))
+                                 ((@ (@ ((@ this name-view)) $el) select))
                                  ))
            (this.on :end-edit-name (lambda (e)
                                      ((@ this name-view)
@@ -117,10 +213,16 @@
            (this.on "change:selected" (lambda (e)
                                         ((@ this $el toggle-class) "ChannelSelected"))))
     render (lambda ()
-             (let ((html (this.channel.map
-                             (lambda (note)
-                               ((@ (new (*View *Note-view note)) render))))))
+             (let* ((i 0)
+                    (html (this.channel.map
+                           (lambda (note)
+                             (let ((view (new (*View *Note-view note))))
+                               (when (= 0 (rem i 4))
+                                 ((@ (@ view $el) attr) :class "NoteViewHighlight"))
+                               (incf i)
+                               ((@  view render)))))))
                ((@ html unshift) ((@ ((@ this controls-view)) render)))
+               ((@ html unshift) ((@ ((@ this monitor-view)) render)))
                ((@ html unshift) ((@ ((@ this name-view)) render)))
+               ((@ html unshift) ((@ ((@ this title-view)) render)))
                (this.$el.html html))))
-

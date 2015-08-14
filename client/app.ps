@@ -1,21 +1,22 @@
 ;; -*- mode: lisp -*-
 (load "macros.ps")
+(load "utils.ps")
 
 (defvar default-num-channels 12)
 (defvar default-pattern-length 32)
 
 (defmodel *Note
-    init (lambda (instrument pitch fx)
+    init (lambda (instrument pitch fx arg)
            (this.create :instrument instrument)
            (this.create :pitch pitch)
            (this.create :fx fx)
+           (this.create :arg arg)
            ))
 
 (defcontainer *Channel *Note
-  init (lambda (index name size)
+  init (lambda (name size)
          (this.create :size (or size default-pattern-length))
-         (this.create :index index)
-         (this.create :name (or name index))
+         (this.create :name name)
          (this.create :gain 128)
          (this.create :pan 128)
          (this.create :mute f)
@@ -26,37 +27,44 @@
 
 (defcontainer *Pattern *Channel
   init (lambda (index name size)
-         (this.create :size (or size default-pattern-length))
+         (this.create :size (or size default-num-channels))
          (this.create :index index)
          (this.create :name (or name index))
          (dotimes (i (this.size))
-           (this.add (new (*Class *Channel i))))))
+           (this.add (new (*Class *Channel i))))
+
+         (this.on :close-channel
+                  (lambda (e)
+                    (this.remove e.value)))
+         (this.on :add-channel
+                  (lambda (e)
+                    (let ((i ((@ this index-of) e.value)))
+                      ((@ this insert-at) (1+ i) (new (*Class *Channel "--"))))))
+         (this.on :copy-channel
+                  (lambda (e)
+                    (let ((i ((@ this index-of) e.value)))
+                      ((@ this insert-at) (1+ i) (e.value.copy)))))
+         (this.on :move-channel-left
+                  (lambda (e)
+                    (let ((i ((@ this index-of) e.value)))
+                      (if (> i 0)
+                          (this.swap i (1- i))))))
+         (this.on :move-channel-right
+                  (lambda (e)
+                    (let ((i ((@ this index-of) e.value)))
+                      (if (< i (- this.length 1))
+                          (this.swap i (1+ i))))))
+         ))
 
 (defcontainer *Song *Pattern
   init (lambda (name name)
-         (this.create :size (or size default-pattern-length))
+         (this.create :size (or size 1))
          (this.create :name (or name index))))
 
+(load "common-views.ps")
 (load "note-view.ps")
 (load "channel-view.ps")
-
-(defview *Pattern-view
-    model "pattern"
-    contains "ChannelView"
-    init (lambda ()
-           (this.pattern.on :add this.render this)
-           (this.pattern.each (lambda (channel)
-                                (this.add (new (*View *Channel-view channel)))) this)
-           (this.create 'current-channel-view (this.at 0))
-           ((@ (this.at 0) selected) t)
-           (this.on :channel-select (lambda (e)
-                                      ((@ ((@ this current-channel-view)) selected) f)
-                                      ((@ this current-channel-view) e.value)
-                                      ((@ ((@ this current-channel-view)) selected) t))))
-    render (lambda ()
-             (this.$el.html (this.map
-                             (lambda (channel-view)
-                               ((@ channel-view render)))))))
+(load "pattern-edit-view.ps")
 
 ((@ ($ document) ready)
  (lambda ()

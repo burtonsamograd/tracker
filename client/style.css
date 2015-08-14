@@ -7,15 +7,14 @@
 
 
 input[type=text] {
-    border: 0px;
+    border: 0px solid;
     background-color: yellow;
     font-size: inherit;
     padding: 0px;
     margin: 0px;
 }
 
-.NoteValueEditView .ChannelValueEditView 
-{
+.TwoCharacterHexValueEditView {
     max-width: 2em;
     display: inline-block;
 }
@@ -25,26 +24,27 @@ input[type=text] {
 }
 
 .ChannelNameView {
-    width: 5em;
+    width: 7em;
     text-align: center;
 }
 
 .ChannelGainView {
-    display: inline-block;
-    text-align: center;
-    width: 1.5em;
+    display: inline;
 }
 
 .ChannelPanView {
-    display: inline-block;
-    text-align: center;
-    width: 1.5em;
+    display: inline;
+}
+
+.ChannelMonitorView {
+    border: 1px solid red;
+    height: .75em;
 }
 
 .ChannelView {
     border: 1px solid;
     padding: .5em;
-    width: 5em;
+    width: 7em;
     display: inline-block;
 }
 
@@ -54,10 +54,16 @@ input[type=text] {
     white-space: nowrap;
 }
 
+.TinyButton {
+    padding-right: .2em;
+    padding-left: .2em;
+    text-align: center;
+    display: inline-block;
+}
 
 .Button {
-    padding-right: .25em;
-    padding-left: .25em;
+    padding-right: .5em;
+    padding-left: .5em;
     text-align: center;
     display: inline-block;
 }
@@ -71,6 +77,21 @@ input[type=text] {
 }
 
 .ChannelSelected {
-    background-color: red;
+    background-color: orange;
 }
 
+.ChannelControlsView {
+    text-align: center;
+}
+
+.ChannelCloseButton {
+    padding-left:  2em;
+}
+
+.ChannelTitleView {
+    border: 1px solid;
+}
+
+.NoteViewHighlight {
+    background-color: lightblue;
+}
