@@ -1,0 +1,10 @@
+;; -*- mode: lisp -*-
+
+(defun hex (x len)
+  (setf len (or len 2))
+  (and x (let ((s ((@ x to-string) 16)))
+           (when (< s.length len) ; zero pad
+             (dotimes (i (+ 1 (- len s.length)))
+               (setf s (+ '0 s))))
+           s)))
+

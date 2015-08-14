@@ -1,0 +1,20 @@
+;; -*- mode: lisp -*-
+
+(defview *Two-character-hex-value-edit-view
+    tag-name "input type='text' maxlength='2' size='2'"
+    init (lambda (model model-value-fn)
+           (setf (@ this model-value-fn) model-value-fn)
+           (this.$el.val ((@ (or ((@ model-value-fn call) this.model) "") to-string) 16)))
+    events (create
+            :keypress (lambda (e)
+                        (if (= (@ e key-code) 13)
+                            (this.finished)))
+            :blur (lambda (e)
+                      (this.finished)))
+    finished (lambda ()
+               (let ((value (parse-int (+ "0x" (this.$el.val)))))
+                 (unless ((eval "isNaN") value) ;; eval hack due to symbol conversion
+                     ((@ this model-value-fn call) this.note value)))
+               (this.trigger :end-edit this))
+    render (lambda ()
+             this.$el))

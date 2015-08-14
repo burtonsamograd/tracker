@@ -1,0 +1,62 @@
+;; -*- mode: lisp -*-
+
+(defview *Pattern-view
+    model "pattern"
+    contains "ChannelView"
+    init (lambda ()
+           (this.pattern.each (lambda (channel)
+                                (let ((view (new (*View *Channel-view channel))))
+                                  (this.add view)
+                                  ((@ view render)))) this)
+           (this.create 'current-channel-view (this.at 0))
+           ((@ (this.at 0) selected) t)
+           (this.on :channel-select (lambda (e)
+                                      ((@ ((@ this current-channel-view)) selected) f)
+                                      ((@ this current-channel-view) e.value)
+                                      ((@ ((@ this current-channel-view)) selected) t)))
+
+           ;; this is a bit hoakey, but rendering optimization makes it so
+           ;; we know :add and :removed come before the :modified message
+           ;; so we can store the values and dispatch to more specifiec
+           ;; view rebuilding functions based on what is added or removed
+           (this.pattern.on :add (lambda (e)
+                                   (setf this.added e.value)) this)
+           (this.pattern.on :remove (lambda (e)
+                                      (setf this.removed e.value)) this)
+           (this.pattern.on :modified (@ this rebuild-views) this))
+
+    add-view (lambda ()
+               (let ((i ((@ this pattern index-of) this.added))
+                     (view (new (*View *Channel-view this.added))))
+                 ((@ this insert-at) i view)
+                 ((@ view render))
+                 (setf this.added nil)))
+                 
+    remove-view (lambda ()
+                  (let ((view (this.find (lambda (channel-view)
+                                           (= (@ channel-view channel) this.removed)))))
+                    (this.remove view)
+                    (setf this.removed nil)))
+
+    reorder-views (lambda ()
+                    (let ((views (this.map (lambda (e) e))))
+                      (this.clear)
+                      (let ((self this))
+                        (this.pattern.each
+                         (lambda (channel)
+                           (dolist (view views)
+                             (if (= (@ view channel) channel)
+                                 (self.add view t))))))))
+
+    rebuild-views (lambda (e)
+                    (if this.added
+                        ((@ this add-view))
+                        (if this.removed
+                            ((@ this remove-view) this.removed)
+                            ((@ this reorder-views))))
+                    (this.render))
+
+    render (lambda ()
+             (this.$el.html (this.map
+                             (lambda (channel-view)
+                               (@ channel-view $el))))))
