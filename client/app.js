@@ -13,8 +13,8 @@ function hex(x, len) {
 };
 /* (DEFVAR DEFAULT-NUM-CHANNELS 12) */
 var defaultNumChannels = 12;
-/* (DEFVAR DEFAULT-PATTERN-LENGTH 16) */
-var defaultPatternLength = 16;
+/* (DEFVAR DEFAULT-PATTERN-SIZE 16) */
+var defaultPatternSize = 16;
 /* (DEFMODEL *NOTE INIT
     (LAMBDA (INSTRUMENT PITCH FX ARG)
       (THIS.CREATE INSTRUMENT INSTRUMENT)
@@ -29,17 +29,36 @@ var Note = { type : 'Note', init : function (instrument, pitch, fx, arg) {
 } };
 /* (DEFCONTAINER *CHANNEL *NOTE INIT
     (LAMBDA (NAME SIZE)
-      (THIS.CREATE SIZE (OR SIZE DEFAULT-PATTERN-LENGTH))
+      (THIS.CREATE SIZE (OR SIZE DEFAULT-PATTERN-SIZE))
       (THIS.CREATE NAME NAME)
       (THIS.CREATE GAIN 128)
       (THIS.CREATE PAN 128)
       (THIS.CREATE MUTE F)
       (THIS.CREATE SOLO F)
-      (DOTIMES (I (THIS.SIZE)) (THIS.ADD (NEW (*CLASS *NOTE)))))) */
+      (DOTIMES (I (THIS.SIZE)) (THIS.ADD (NEW (*CLASS *NOTE))))
+      (THIS.ON change:size
+       (LAMBDA (E)
+         (LET ((OLD-VALUE E.VALUE) (NEW-VALUE ((@ THIS SIZE))))
+           (IF (> OLD-VALUE NEW-VALUE)
+               (THIS.SHRINK OLD-VALUE NEW-VALUE)
+               (IF (< OLD-VALUE NEW-VALUE)
+                   (THIS.GROW OLD-VALUE NEW-VALUE)))
+           (UNLESS (= OLD-VALUE NEW-VALUE) (THIS.TRIGGER RESIZE))))))
+    SHRINK
+    (LAMBDA (OLD-VALUE NEW-VALUE)
+      (LET ((TO-REMOVE (ARRAY)) (INDEX ((@ THIS SIZE))))
+        (DOTIMES (I (- OLD-VALUE ((@ THIS SIZE))))
+          ((@ TO-REMOVE PUSH) ((@ THIS AT) INDEX))
+          (INCF INDEX))
+        (DOLIST (E TO-REMOVE) (THIS.REMOVE E T))))
+    GROW
+    (LAMBDA (OLD-VALUE NEW-VALUE)
+      (DOTIMES (I (- NEW-VALUE OLD-VALUE))
+        ((@ THIS INSERT-AT) (1- (+ I OLD-VALUE)) (NEW (*CLASS *NOTE)) T)))) */
 var Channel = { type : 'Channel',
                 contains : 'Note',
                 init : function (name, size) {
-    this.create('size', size || defaultPatternLength);
+    this.create('size', size || defaultPatternSize);
     this.create('name', name);
     this.create('gain', 128);
     this.create('pan', 128);
@@ -48,12 +67,41 @@ var Channel = { type : 'Channel',
     for (var i = 0; i < this.size(); i += 1) {
         this.add(new Class(Note));
     };
+    return this.on('change:size', function (e) {
+        var oldValue = e.value;
+        var newValue = this.size();
+        if (oldValue > newValue) {
+            this.shrink(oldValue, newValue);
+        } else {
+            if (oldValue < newValue) {
+                this.grow(oldValue, newValue);
+            };
+        };
+        return oldValue !== newValue ? this.trigger('resize') : null;
+    });
+},
+                shrink : function (oldValue, newValue) {
+    var toRemove = [];
+    var index = this.size();
+    for (var i = 0; i < oldValue - this.size(); i += 1) {
+        toRemove.push(this.at(index));
+        ++index;
+    };
+    for (var e = null, _js_idx1 = 0; _js_idx1 < toRemove.length; _js_idx1 += 1) {
+        e = toRemove[_js_idx1];
+        this.remove(e, true);
+    };
+},
+                grow : function (oldValue, newValue) {
+    for (var i = 0; i < newValue - oldValue; i += 1) {
+        this.insertAt((i + oldValue) - 1, new Class(Note), true);
+    };
 }
               };
 /* (DEFCONTAINER *PATTERN *CHANNEL INIT
     (LAMBDA (NAME SIZE)
       (THIS.CREATE NAME NAME)
-      (THIS.CREATE SIZE (OR SIZE DEFAULT-PATTERN-LENGTH))
+      (THIS.CREATE SIZE (OR SIZE DEFAULT-PATTERN-SIZE))
       (DOTIMES (I DEFAULT-NUM-CHANNELS)
         (THIS.ADD (NEW (*CLASS *CHANNEL I ((@ THIS SIZE))))))
       (THIS.ON CLOSE-CHANNEL (LAMBDA (E) (THIS.REMOVE E.VALUE)))
@@ -74,12 +122,15 @@ var Channel = { type : 'Channel',
        (LAMBDA (E)
          (LET ((I ((@ THIS INDEX-OF) E.VALUE)))
            (IF (< I (- THIS.LENGTH 1))
-               (THIS.SWAP I (1+ I)))))))) */
+               (THIS.SWAP I (1+ I))))))
+      (THIS.ON change:size
+       (LAMBDA (E)
+         (THIS.EACH (LAMBDA (CHANNEL) ((@ CHANNEL SIZE) ((@ THIS SIZE))))))))) */
 var Pattern = { type : 'Pattern',
                 contains : 'Channel',
                 init : function (name, size) {
     this.create('name', name);
-    this.create('size', size || defaultPatternLength);
+    this.create('size', size || defaultPatternSize);
     for (var i = 0; i < defaultNumChannels; i += 1) {
         this.add(new Class(Channel, i, this.size()));
     };
@@ -98,9 +149,14 @@ var Pattern = { type : 'Pattern',
         var i = this.indexOf(e.value);
         return i > 0 ? this.swap(i, i - 1) : null;
     });
-    return this.on('move-channel-right', function (e) {
+    this.on('move-channel-right', function (e) {
         var i = this.indexOf(e.value);
         return i < this.length - 1 ? this.swap(i, i + 1) : null;
+    });
+    return this.on('change:size', function (e) {
+        return this.each(function (channel) {
+            return channel.size(this.size());
+        });
     });
 }
               };
@@ -364,9 +420,10 @@ var ChannelView = { type : 'ChannelView',
     this.create('controlsView', new View(ChannelControlsView, this.channel));
     this.create('monitorView', new View(ChannelMonitorView));
     this.create('selected', false);
-    return this.on('change:selected', function (e) {
+    this.on('change:selected', function (e) {
         return this.$el.toggleClass('ChannelSelected');
     });
+    return this.channel.on('resize', this.render, this);
 },
                     render : function () {
     this.clear();
@@ -378,7 +435,7 @@ var ChannelView = { type : 'ChannelView',
         };
         ++i;
         this.add(view);
-        return view.render();
+        return view.$el;
     }, this);
     html.unshift(this.controlsView().render());
     html.unshift(this.monitorView().render());
@@ -440,8 +497,8 @@ var PatternEditView = { type : 'PatternEditView',
     this.clear();
     var self = this;
     return this.pattern.each(function (channel) {
-        for (var view = null, _js_idx1 = 0; _js_idx1 < views.length; _js_idx1 += 1) {
-            view = views[_js_idx1];
+        for (var view = null, _js_idx2 = 0; _js_idx2 < views.length; _js_idx2 += 1) {
+            view = views[_js_idx2];
             if (view.channel === channel) {
                 self.add(view, true);
             };

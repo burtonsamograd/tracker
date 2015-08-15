@@ -3,7 +3,7 @@
 (load "utils.ps")
 
 (defvar default-num-channels 12)
-(defvar default-pattern-length 16)
+(defvar default-pattern-size 16)
 
 (defmodel *Note
     init (lambda (instrument pitch fx arg)
@@ -15,7 +15,7 @@
 
 (defcontainer *Channel *Note
   init (lambda (name size)
-         (this.create :size (or size default-pattern-length))
+         (this.create :size (or size default-pattern-size))
          (this.create :name name)
          (this.create :gain 128)
          (this.create :pan 128)
@@ -23,12 +23,37 @@
          (this.create :solo f)
 
          (dotimes (i (this.size))
-           (this.add (new (*Class *Note))))))
+           (this.add (new (*Class *Note))))
+
+         (this.on "change:size"
+                  (lambda (e)
+                    (let ((old-value e.value)
+                          (new-value ((@ this size))))
+                      (if (> old-value new-value)
+                          (this.shrink old-value new-value)
+                          (if (< old-value new-value)
+                              (this.grow old-value new-value)))
+                      (unless (= old-value new-value)
+                        (this.trigger :resize))))))
+
+  shrink (lambda (old-value new-value)
+           (let ((to-remove (array))
+                 (index ((@ this size))))
+             (dotimes (i (- old-value ((@ this size))))
+               ((@ to-remove push) ((@ this at) index))
+               (incf index))
+             (dolist (e to-remove)
+               (this.remove e t))))
+
+  grow (lambda (old-value new-value)
+         (dotimes (i (- new-value old-value))
+           ((@ this insert-at) (1- (+ i old-value))
+            (new (*Class *Note)) t))))
 
 (defcontainer *Pattern *Channel
   init (lambda (name size)
          (this.create :name name)
-         (this.create :size (or size default-pattern-length))
+         (this.create :size (or size default-pattern-size))
          (dotimes (i default-num-channels)
            (this.add (new (*Class *Channel i ((@ this size))))))
 
@@ -53,6 +78,10 @@
                     (let ((i ((@ this index-of) e.value)))
                       (if (< i (- this.length 1))
                           (this.swap i (1+ i))))))
+
+         (this.on "change:size" (lambda (e)
+                                  (this.each (lambda (channel)
+                                               ((@ channel size) ((@ this size)))))))
          ))
 
 (defcontainer *Song *Pattern
