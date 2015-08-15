@@ -62,12 +62,11 @@
            (this.create 'copy-button (new (*View *Channel-copy-button-view model))))
     render (lambda ()
              (let ((html (array
-                          ((@ ((@ this left-button)) render))
-                          ((@ ((@ this right-button)) render))
-                          ((@ ((@ this add-button)) render))
-                          ((@ ((@ this copy-button)) render))
-                          ((@ ((@ this close-button)) render))
-                     )))
+                          (@ ((@ this left-button)) $el)
+                          (@ ((@ this right-button)) $el)
+                          (@ ((@ this add-button)) $el)
+                          (@ ((@ this copy-button)) $el)
+                          (@ ((@ this close-button)) $el))))
                (this.$el.html html))))
 
 (defview *Channel-solo-button-view
@@ -105,15 +104,15 @@
                                                "ChannelPanView" this.channel.pan 2))))
     render (lambda ()
              (let ((html (array
-                          ((@ ((@ this gain-view)) render))
-                          ((@ ((@ this solo-button)) render))
-                          ((@ ((@ this mute-button)) render))
-                          ((@ ((@ this pan-view)) render))
-                     )))
+                          (@ ((@ this gain-view)) $el)
+                          (@ ((@ this solo-button)) $el)
+                          (@ ((@ this mute-button)) $el)
+                          (@ ((@ this pan-view)) $el))))
                (this.$el.html html))))
 
 (defview *Channel-view
     model 'channel
+    contains '*Note-view
     events (create
             'mousedown (lambda (e)
                          ((@ e prevent-default)))
@@ -129,7 +128,9 @@
            (this.create 'monitor-view (new (*View *Channel-monitor-view)))
            (this.create 'selected f)
            (this.on "change:selected" (lambda (e)
-                                        ((@ this $el toggle-class) "ChannelSelected")))
+                                        (if (@ e value)
+                                            ((@ this $el remove-class) "ChannelSelected")
+                                            ((@ this $el add-class) "ChannelSelected"))))
            (this.channel.on :resize this.render this))
 
     render (lambda ()
@@ -143,8 +144,8 @@
                                (incf i)
                                (this.add view)
                                (@  view $el))) this)))
-               ((@ html unshift) ((@ ((@ this controls-view)) render)))
-               ((@ html unshift) ((@ ((@ this monitor-view)) render)))
-               ((@ html unshift) ((@ ((@ this name-view)) render)))
-               ((@ html unshift) ((@ ((@ this title-view)) render)))
+               ((@ html unshift) (@ ((@ this controls-view)) $el))
+               ((@ html unshift) (@ ((@ this monitor-view)) $el))
+               ((@ html unshift) (@ ((@ this name-view)) $el))
+               ((@ html unshift) (@ ((@ this title-view)) $el))
                (this.$el.html html))))

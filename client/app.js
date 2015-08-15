@@ -11,8 +11,8 @@ function hex(x, len) {
         };
     })() : null, s));
 };
-/* (DEFVAR DEFAULT-NUM-CHANNELS 12) */
-var defaultNumChannels = 12;
+/* (DEFVAR DEFAULT-NUM-CHANNELS 8) */
+var defaultNumChannels = 8;
 /* (DEFVAR DEFAULT-PATTERN-SIZE 16) */
 var defaultPatternSize = 16;
 /* (DEFMODEL *NOTE INIT
@@ -108,7 +108,8 @@ var Channel = { type : 'Channel',
       (THIS.ON ADD-CHANNEL
        (LAMBDA (E)
          (LET ((I ((@ THIS INDEX-OF) E.VALUE)))
-           ((@ THIS INSERT-AT) (1+ I) (NEW (*CLASS *CHANNEL --))))))
+           ((@ THIS INSERT-AT) (1+ I)
+            (NEW (*CLASS *CHANNEL -- ((@ THIS SIZE))))))))
       (THIS.ON COPY-CHANNEL
        (LAMBDA (E)
          (LET ((I ((@ THIS INDEX-OF) E.VALUE)))
@@ -139,7 +140,7 @@ var Pattern = { type : 'Pattern',
     });
     this.on('add-channel', function (e) {
         var i = this.indexOf(e.value);
-        return this.insertAt(i + 1, new Class(Channel, '--'));
+        return this.insertAt(i + 1, new Class(Channel, '--', this.size()));
     });
     this.on('copy-channel', function (e) {
         var i = this.indexOf(e.value);
@@ -359,7 +360,7 @@ var ChannelTitleView = { type : 'ChannelTitleView',
     return this.create('copyButton', new View(ChannelCopyButtonView, model));
 },
                          render : function () {
-    var html = [this.leftButton().render(), this.rightButton().render(), this.addButton().render(), this.copyButton().render(), this.closeButton().render()];
+    var html = [this.leftButton().$el, this.rightButton().$el, this.addButton().$el, this.copyButton().$el, this.closeButton().$el];
     return this.$el.html(html);
 }
                        };
@@ -402,12 +403,13 @@ var ChannelControlsView = { type : 'ChannelControlsView',
     return this.create('panView', new View(HexValueEditView, this.channel, 'ChannelPanView', this.channel.pan, 2));
 },
                             render : function () {
-    var html = [this.gainView().render(), this.soloButton().render(), this.muteButton().render(), this.panView().render()];
+    var html = [this.gainView().$el, this.soloButton().$el, this.muteButton().$el, this.panView().$el];
     return this.$el.html(html);
 }
                           };
 var ChannelView = { type : 'ChannelView',
                     model : 'channel',
+                    contains : 'NoteView',
                     events : { 'mousedown' : function (e) {
     return e.preventDefault();
 }, 'click' : function (e) {
@@ -421,7 +423,7 @@ var ChannelView = { type : 'ChannelView',
     this.create('monitorView', new View(ChannelMonitorView));
     this.create('selected', false);
     this.on('change:selected', function (e) {
-        return this.$el.toggleClass('ChannelSelected');
+        return e.value ? this.$el.removeClass('ChannelSelected') : this.$el.addClass('ChannelSelected');
     });
     return this.channel.on('resize', this.render, this);
 },
@@ -437,10 +439,10 @@ var ChannelView = { type : 'ChannelView',
         this.add(view);
         return view.$el;
     }, this);
-    html.unshift(this.controlsView().render());
-    html.unshift(this.monitorView().render());
-    html.unshift(this.nameView().render());
-    html.unshift(this.titleView().render());
+    html.unshift(this.controlsView().$el);
+    html.unshift(this.monitorView().$el);
+    html.unshift(this.nameView().$el);
+    html.unshift(this.titleView().$el);
     return this.$el.html(html);
 }
                   };
@@ -451,8 +453,7 @@ var PatternEditView = { type : 'PatternEditView',
                         init : function () {
     this.pattern.each(function (channel) {
         var view = new View(ChannelView, channel);
-        this.add(view);
-        return view.render();
+        return this.add(view);
     }, this);
     this.create('currentChannelView', this.at(0));
     this.at(0).selected(true);
@@ -480,7 +481,6 @@ var PatternEditView = { type : 'PatternEditView',
     var i = this.pattern.indexOf(this.added);
     var view = new View(ChannelView, this.added);
     this.insertAt(i, view);
-    view.render();
     return this.added = null;
 },
                         removeView : function () {

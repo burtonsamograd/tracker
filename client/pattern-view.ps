@@ -7,8 +7,7 @@
     init (lambda ()
            (this.pattern.each (lambda (channel)
                                 (let ((view (new (*View *Channel-view channel))))
-                                  (this.add view)
-                                  ((@ view render)))) this)
+                                  (this.add view))) this)
            (this.create 'current-channel-view (this.at 0))
            ((@ (this.at 0) selected) t)
 
@@ -25,7 +24,7 @@
                                    ((@ this current-note-view) e.value)
                                    ((@ ((@ this current-note-view)) selected) t)))
 
-           ;; this is a bit hoakey, but rendering optimization makes it so
+           ;; this is a bit hokey, but rendering optimization makes it so
            ;; we know :add and :removed come before the :modified message
            ;; so we can store the values and dispatch to more specifiec
            ;; view rebuilding functions based on what is added or removed
@@ -39,7 +38,6 @@
                (let ((i ((@ this pattern index-of) this.added))
                      (view (new (*View *Channel-view this.added))))
                  ((@ this insert-at) i view)
-                 ((@ view render))
                  (setf this.added nil)))
                  
     remove-view (lambda ()

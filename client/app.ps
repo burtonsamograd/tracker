@@ -2,7 +2,7 @@
 (load "macros.ps")
 (load "utils.ps")
 
-(defvar default-num-channels 12)
+(defvar default-num-channels 8)
 (defvar default-pattern-size 16)
 
 (defmodel *Note
@@ -63,7 +63,7 @@
          (this.on :add-channel
                   (lambda (e)
                     (let ((i ((@ this index-of) e.value)))
-                      ((@ this insert-at) (1+ i) (new (*Class *Channel "--"))))))
+                      ((@ this insert-at) (1+ i) (new (*Class *Channel "--" ((@ this size))))))))
          (this.on :copy-channel
                   (lambda (e)
                     (let ((i ((@ this index-of) e.value)))
