@@ -94,59 +94,15 @@
                  (this.$el.attr 'class "Button ButtonDisabled"))
              (this.$el.text "M")))
 
-(defview *Channel-gain-view
-    model 'channel
-    events (create
-            'click (lambda (e)
-                     (this.trigger :edit this)))
-    render (lambda ()
-             (this.$el.text (hex (this.channel.gain)))))
-
-(defview *Channel-pan-view
-    model 'channel
-    events (create
-            'click (lambda (e)
-                     (this.trigger :edit this)))
-    render (lambda ()
-             (this.$el.text (hex (this.channel.pan)))))
-
 (defview *Channel-controls-view
     model 'channel
     init (lambda (model)
            (this.create 'solo-button (new (*View *Channel-solo-button-view this.channel)))
            (this.create 'mute-button (new (*View *Channel-mute-button-view this.channel)))
-           (this.create 'gain-view (new (*View *Channel-gain-view this.channel)))
-           (this.create 'pan-view (new (*View *Channel-pan-view this.channel)))
-
-           (this.on :edit (lambda (e)
-                            (let (view)
-                              (cond
-                                ((= ((@ this gain-view)) e.value)
-                                 (setf view
-                                       (new (*View *Two-character-hex-value-edit-view this.channel
-                                            this.channel.gain)))
-                               ((@ this gain-view) view))
-                              ((= ((@ this pan-view)) e.value)
-                                 (setf view
-                                       (new (*View *Two-character-hex-value-edit-view this.channel
-                                            this.channel.pan)))
-                               ((@ this pan-view) view)))
-                              (this.render)
-                              (view.$el.focus)
-                              (view.$el.select)
-                              )))
-
-           (this.on :end-edit (lambda (e)
-                                (cond
-                                  ((= ((@ this gain-view)) e.value)
-                                   ((@ this gain-view)
-                                    (new (*View *Channel-gain-view this.channel))))
-                                  ((= ((@ this pan-view)) e.value)
-                                   ((@ this pan-view)
-                                    (new (*View *Channel-pan-view this.channel)))))
-                                (this.render))))
-                         
-    
+           (this.create 'gain-view (new (*View *Hex-value-edit-view this.channel
+                                               "ChannelGainView" this.channel.gain 2)))
+           (this.create 'pan-view (new (*View *Hex-value-edit-view this.channel
+                                               "ChannelPanView" this.channel.pan 2))))
     render (lambda ()
              (let ((html (array
                           ((@ ((@ this gain-view)) render))
@@ -213,6 +169,7 @@
            (this.on "change:selected" (lambda (e)
                                         ((@ this $el toggle-class) "ChannelSelected"))))
     render (lambda ()
+             (this.clear)
              (let* ((i 0)
                     (html (this.channel.map
                            (lambda (note)
@@ -220,7 +177,8 @@
                                (when (= 0 (rem i 4))
                                  ((@ (@ view $el) attr) :class "NoteViewHighlight"))
                                (incf i)
-                               ((@  view render)))))))
+                               (this.add view)
+                               ((@  view render)))) this)))
                ((@ html unshift) ((@ ((@ this controls-view)) render)))
                ((@ html unshift) ((@ ((@ this monitor-view)) render)))
                ((@ html unshift) ((@ ((@ this name-view)) render)))

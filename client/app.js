@@ -125,110 +125,81 @@ var TwoCharacterHexValueEditView = { type : 'TwoCharacterHexValueEditView',
 },
                                      events : { 'keypress' : function (e) {
     return e.keyCode === 13 ? this.finished() : null;
-}, 'blur' : function (e) {
+}, 'focusout' : function (e) {
     return this.finished();
 } },
-                                     finished : function () {
+                                     finished : function (silent) {
     var value = parseInt('0x' + this.$el.val());
     if (!eval('isNaN')(value)) {
         this.modelValueFn.call(this.note, value);
     };
-    return this.trigger('end-edit', this);
-},
-                                     render : function () {
-    return this.$el;
+    return !silent ? this.trigger('end-edit', this) : null;
 }
                                    };
+var HexValueEditView = { type : 'HexValueEditView',
+                         init : function (model, className, modelValueFn, width) {
+    this.modelValueFn = modelValueFn;
+    this.className = className;
+    this.width = width || 2;
+    this.placeholder = '-';
+    for (var i = 0; i < this.width - 1; i += 1) {
+        this.placeholder += '-';
+    };
+    return this.endEdit();
+},
+                         initialEvents : { 'dblclick' : function (e) {
+    return this.edit();
+} },
+                         editEvents : { 'keypress' : function (e) {
+    return e.keyCode === 13 ? this.finished() : null;
+}, 'focusout' : function (e) {
+    return this.finished();
+} },
+                         edit : function () {
+    var input = $('<input type=\'text\' maxlength=\'' + this.width + '\' size=\'' + this.width + '\'/>');
+    input.val(hex(this.modelValueFn.call(this.model), this.width) || '');
+    for (var event in this.editEvents) {
+        input.bind(event, this.editEvents[event].bind(this));
+    };
+    this.$el.html(input);
+    input.focus();
+    input.select();
+    return this.input = input;
+},
+                         endEdit : function () {
+    this.$el.text(hex(this.modelValueFn.call(this.model), this.width) || this.placeholder);
+    this.$el.attr('class', this.className);
+    for (var event in this.initialEvents) {
+        this.$el.bind(event, this.initialEvents[event].bind(this));
+    };
+    return this.input = null;
+},
+                         finished : function (silent) {
+    var value = parseInt('0x' + this.input.val());
+    if (!eval('isNaN')(value)) {
+        this.modelValueFn.call(this.model, value);
+    };
+    return this.endEdit();
+}
+                       };
 /* (LOAD note-view.ps) */
-var NotePitchView = { type : 'NotePitchView',
-                      tagName : 'span',
-                      model : 'note',
-                      events : { 'click' : function (e) {
-    return this.trigger('edit', this);
-} },
-                      init : function (model) {
-    return this.note.on('change', this.render, this);
-},
-                      render : function () {
-    return this.$el.text(hex(this.note.pitch()) || '--');
-}
-                    };
-var NoteFxView = { type : 'NoteFxView',
-                   tagName : 'span',
-                   model : 'note',
-                   events : { 'click' : function (e) {
-    return this.trigger('edit', this);
-} },
-                   init : function (model) {
-    return this.note.on('change', this.render, this);
-},
-                   render : function () {
-    return this.$el.text(hex(this.note.fx()) || '--');
-}
-                 };
-var NoteArgView = { type : 'NoteArgView',
-                    tagName : 'span',
-                    model : 'note',
-                    events : { 'click' : function (e) {
-    return this.trigger('edit', this);
-} },
-                    init : function (model) {
-    return this.note.on('change', this.render, this);
-},
-                    render : function () {
-    return this.$el.text(hex(this.note.arg()) || '--');
-}
-                  };
-var NoteInstrumentView = { type : 'NoteInstrumentView',
-                           tagName : 'span',
-                           model : 'note',
-                           events : { 'click' : function (e) {
-    return this.trigger('edit', this);
-} },
-                           init : function (model) {
-    return this.note.on('change', this.render, this);
-},
-                           render : function () {
-    return this.$el.text(hex(this.note.instrument()) || '--');
-}
-                         };
 var NoteView = { type : 'NoteView',
                  model : 'note',
+                 events : { 'click' : function (e) {
+    return this.trigger('note-select', this);
+} },
                  init : function (model) {
-    this.create('pitchView', new View(NotePitchView, this.note));
-    this.create('fxView', new View(NoteFxView, this.note));
-    this.create('argView', new View(NoteArgView, this.note));
-    this.create('instrumentView', new View(NoteInstrumentView, this.note));
-    this.on('edit', function (e) {
-        var el = null;
-        if (this.pitchView() === e.value) {
-            this.pitchView(el = new View(TwoCharacterHexValueEditView, this.note, this.note.pitch));
-        } else if (this.fxView() === e.value) {
-            this.fxView(el = new View(TwoCharacterHexValueEditView, this.note, this.note.fx));
-        } else if (this.argView() === e.value) {
-            this.argView(el = new View(TwoCharacterHexValueEditView, this.note, this.note.arg));
-        } else if (this.instrumentView() === e.value) {
-            this.instrumentView(el = new View(TwoCharacterHexValueEditView, this.note, this.note.instrument));
-        };
-        this.render();
-        el.$el.focus();
-        return el.$el.select();
-    });
-    return this.on('end-edit', function (e) {
-        if (this.pitchView() === e.value) {
-            this.pitchView(new View(NotePitchView, this.note));
-        } else if (this.fxView() === e.value) {
-            this.fxView(new View(NoteFxView, this.note));
-        } else if (this.argView() === e.value) {
-            this.argView(new View(NoteArgView, this.note));
-        } else if (this.instrumentView() === e.value) {
-            this.instrumentView(new View(NoteInstrumentView, this.note));
-        };
-        return this.render();
+    this.create('pitchView', new View(HexValueEditView, this.channel, 'NotePitchView', this.note.pitch));
+    this.create('fxView', new View(HexValueEditView, this.channel, 'NoteFxView', this.note.fx));
+    this.create('argView', new View(HexValueEditView, this.channel, 'NoteArgView', this.note.arg, 3));
+    this.create('instrumentView', new View(HexValueEditView, this.channel, 'NoteInstrumentView', this.note.instrument));
+    this.create('selected');
+    return this.on('change:selected', function (e) {
+        return e.value ? this.$el.addClass('NoteViewSelected') : this.$el.removeClass('NoteViewSelected');
     });
 },
                  render : function () {
-    return this.$el.html([this.pitchView().render(), '&nbsp;', this.fxView().render(), '&nbsp;', this.argView().render(), '&nbsp;', this.instrumentView().render()]);
+    return this.$el.html([this.pitchView().render(), this.fxView().render(), this.argView().render(), this.instrumentView().render()]);
 }
                };
 /* (LOAD channel-view.ps) */
@@ -332,52 +303,13 @@ var ChannelMuteButtonView = { type : 'ChannelMuteButtonView',
     return this.$el.text('M');
 }
                             };
-var ChannelGainView = { type : 'ChannelGainView',
-                        model : 'channel',
-                        events : { 'click' : function (e) {
-    return this.trigger('edit', this);
-} },
-                        render : function () {
-    return this.$el.text(hex(this.channel.gain()));
-}
-                      };
-var ChannelPanView = { type : 'ChannelPanView',
-                       model : 'channel',
-                       events : { 'click' : function (e) {
-    return this.trigger('edit', this);
-} },
-                       render : function () {
-    return this.$el.text(hex(this.channel.pan()));
-}
-                     };
 var ChannelControlsView = { type : 'ChannelControlsView',
                             model : 'channel',
                             init : function (model) {
     this.create('soloButton', new View(ChannelSoloButtonView, this.channel));
     this.create('muteButton', new View(ChannelMuteButtonView, this.channel));
-    this.create('gainView', new View(ChannelGainView, this.channel));
-    this.create('panView', new View(ChannelPanView, this.channel));
-    this.on('edit', function (e) {
-        var view = null;
-        if (this.gainView() === e.value) {
-            view = new View(TwoCharacterHexValueEditView, this.channel, this.channel.gain);
-            this.gainView(view);
-        } else if (this.panView() === e.value) {
-            view = new View(TwoCharacterHexValueEditView, this.channel, this.channel.pan);
-            this.panView(view);
-        };
-        this.render();
-        view.$el.focus();
-        return view.$el.select();
-    });
-    return this.on('end-edit', function (e) {
-        if (this.gainView() === e.value) {
-            this.gainView(new View(ChannelGainView, this.channel));
-        } else if (this.panView() === e.value) {
-            this.panView(new View(ChannelPanView, this.channel));
-        };
-        return this.render();
-    });
+    this.create('gainView', new View(HexValueEditView, this.channel, 'ChannelGainView', this.channel.gain, 2));
+    return this.create('panView', new View(HexValueEditView, this.channel, 'ChannelPanView', this.channel.pan, 2));
 },
                             render : function () {
     var html = [this.gainView().render(), this.soloButton().render(), this.muteButton().render(), this.panView().render()];
@@ -439,6 +371,7 @@ var ChannelView = { type : 'ChannelView',
     });
 },
                     render : function () {
+    this.clear();
     var i = 0;
     var html = this.channel.map(function (note) {
         var view = new View(NoteView, note);
@@ -446,8 +379,9 @@ var ChannelView = { type : 'ChannelView',
             view.$el.attr('class', 'NoteViewHighlight');
         };
         ++i;
+        this.add(view);
         return view.render();
-    });
+    }, this);
     html.unshift(this.controlsView().render());
     html.unshift(this.monitorView().render());
     html.unshift(this.nameView().render());
@@ -471,6 +405,13 @@ var PatternView = { type : 'PatternView',
         this.currentChannelView().selected(false);
         this.currentChannelView(e.value);
         return this.currentChannelView().selected(true);
+    });
+    this.create('currentNoteView', this.at(0).at(0));
+    this.at(0).at(0).selected(true);
+    this.on('note-select', function (e) {
+        this.currentNoteView().selected(false);
+        this.currentNoteView(e.value);
+        return this.currentNoteView().selected(true);
     });
     this.pattern.on('add', function (e) {
         return this.added = e.value;

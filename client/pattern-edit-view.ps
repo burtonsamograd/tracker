@@ -3,6 +3,7 @@
 (defview *Pattern-view
     model "pattern"
     contains "ChannelView"
+
     init (lambda ()
            (this.pattern.each (lambda (channel)
                                 (let ((view (new (*View *Channel-view channel))))
@@ -10,10 +11,19 @@
                                   ((@ view render)))) this)
            (this.create 'current-channel-view (this.at 0))
            ((@ (this.at 0) selected) t)
+
            (this.on :channel-select (lambda (e)
                                       ((@ ((@ this current-channel-view)) selected) f)
                                       ((@ this current-channel-view) e.value)
                                       ((@ ((@ this current-channel-view)) selected) t)))
+
+           (this.create 'current-note-view ((@ (this.at 0) at) 0))
+           ((@ ((@ (this.at 0) at) 0) selected) t)
+
+           (this.on :note-select (lambda (e)
+                                   ((@ ((@ this current-note-view)) selected) f)
+                                   ((@ this current-note-view) e.value)
+                                   ((@ ((@ this current-note-view)) selected) t)))
 
            ;; this is a bit hoakey, but rendering optimization makes it so
            ;; we know :add and :removed come before the :modified message

@@ -3,6 +3,7 @@
     font-weight: bold;
     padding: 0px;
     margin: 0px;
+    cursor: pointer;
 }
 
 
@@ -44,13 +45,14 @@ input[type=text] {
 .ChannelView {
     border: 1px solid;
     padding: .5em;
-    width: 7em;
+    width: 7.5em;
     display: inline-block;
 }
 
 .PatternView {
     border: 1px dotted;
     overflow: auto;
+    overflow-y: hidden;
     white-space: nowrap;
 }
 
@@ -94,4 +96,32 @@ input[type=text] {
 
 .NoteViewHighlight {
     background-color: lightblue;
+}
+
+.NoteViewSelected {
+    background-color: green;
+}
+
+.NotePitchView {
+    display: inline-block;
+    padding-left: .25em;
+    padding-right: .25em;
+}
+
+.NoteFxView {
+    display: inline-block;
+    padding-left: .25em;
+    padding-right: .25em;
+}
+
+.NoteArgView {
+    display: inline-block;
+    padding-left: .25em;
+    padding-right: .25em;
+}
+
+.NoteInstrumentView {
+    display: inline-block;
+    padding-left: .25em;
+    padding-right: .25em;
 }

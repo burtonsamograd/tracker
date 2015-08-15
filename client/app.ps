@@ -72,5 +72,8 @@
           (pattern (new (*Class *Pattern 0)))
           (note-view (new (*View *Note-view note)))
           (pattern-view (new (*View *Pattern-view pattern))))
-     ((@ ($ 'body) html) ((@ pattern-view render))))))
+     ((@ ($ 'body) html) ((@ pattern-view render)))
+;     ((@ ($ document) bind) 'keydown (lambda (e)
+;                                       (console.log (@ e char-code))))
+     )))
    
