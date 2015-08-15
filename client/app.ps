@@ -86,7 +86,7 @@
 
 (defcontainer *Song *Pattern
   init (lambda (name size)
-         (this.create 'size (or size 1))
+         (this.create 'size (or size 8))
          (this.create 'name (or name index))
          (dotimes (i ((@ this size)))
            (this.add (new (*Class *Pattern i))))))
@@ -100,23 +100,13 @@
 (load "note-view.ps")
 (load "channel-view.ps")
 (load "pattern-view.ps")
+(load "song-view.ps")
 
 (defview *Minibuffer-view
     model "app"
     render (lambda ()
              ((@ this $el html) "<input class='MinibufferEditorView' type='text'>")))
 
-
-(defview *Song-view
-    model "song"
-    contains '*Pattern-view
-    init (lambda (model)
-           ((@ this song each) (lambda (pattern)
-                                 (this.add (new (*View *Pattern-view pattern)))) this))
-
-    render (lambda ()
-             ((@ this $el html) (this.map (lambda (pattern-view)
-                                            (@ pattern-view $el))))))
 
 (defview *App-view
     model "app"

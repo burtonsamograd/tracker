@@ -72,8 +72,31 @@ input[type=text] {
 .PatternView {
     border: 1px solid;
 }
+
+.SongView {
+    white-space: nowrap;
+}
+
+.SongPatternEditSelectView {
+    border: solid 2px;
+    padding: .25em;
+    width: 12em;
+    display: inline-block;
+}
+
+.SongPatternEditNameSelectorView {
+    height: 5.5em;
+    overflow: auto;
+}
+.SongPatternEditSelectNameSelectedView {
+    background-color: orange;
+}
+
+.PatternView {
+    border: 1px solid red;
+}
+
 .PatternEditView {
-    width: 100%;
     border: 1px solid;
     overflow: auto;
     overflow-y: hidden;
@@ -81,7 +104,6 @@ input[type=text] {
 }
 
 .PatternModeLineView {
-    width: 100%;
     border: 2px solid;
 }
 
@@ -156,12 +178,10 @@ input[type=text] {
 }
 
 .MinibufferEditorView {
-    width: 100%;
     background-color: transparent;
 }
 
 .MinibufferView {
-    width: 100%;
     border: 2px solid;
 }
 

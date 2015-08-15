@@ -163,13 +163,13 @@ var Pattern = { type : 'Pattern',
               };
 /* (DEFCONTAINER *SONG *PATTERN INIT
     (LAMBDA (NAME SIZE)
-      (THIS.CREATE 'SIZE (OR SIZE 1))
+      (THIS.CREATE 'SIZE (OR SIZE 8))
       (THIS.CREATE 'NAME (OR NAME INDEX))
       (DOTIMES (I ((@ THIS SIZE))) (THIS.ADD (NEW (*CLASS *PATTERN I)))))) */
 var Song = { type : 'Song',
              contains : 'Pattern',
              init : function (name, size) {
-    this.create('size', size || 1);
+    this.create('size', size || 8);
     this.create('name', name || index);
     for (var i = 0; i < this.size(); i += 1) {
         this.add(new Class(Pattern, i));
@@ -239,6 +239,7 @@ var StringValueEditView = { type : 'StringValueEditView',
     this.modelValueFn = modelValueFn;
     this.className = className;
     this.width = width || 8;
+    this.model.on('change', this.endEdit, this);
     return this.endEdit();
 },
                             initialEvents : { 'dblclick' : function (e) {
@@ -565,6 +566,80 @@ var PatternView = { type : 'PatternView',
     return this.$el.html(html);
 }
                   };
+/* (LOAD song-view.ps) */
+var SongPatternEditSelectNameView = { type : 'SongPatternEditSelectNameView',
+                                      model : 'pattern',
+                                      events : { 'click' : function (e) {
+    this.trigger('selectPattern', this.pattern);
+    return this.select();
+} },
+                                      init : function (model, selected) {
+    this.create('editView', new View(StringValueEditView, this.pattern, 'SongPatternEditSelectNameView', this.pattern.name, 12));
+    return selected ? this.select() : null;
+},
+                                      select : function () {
+    return this.$el.addClass('SongPatternEditSelectNameSelectedView');
+},
+                                      deselect : function () {
+    return this.$el.removeClass('SongPatternEditSelectNameSelectedView');
+},
+                                      render : function () {
+    return this.$el.html(this.editView().$el);
+}
+                                    };
+var SongPatternEditNameSelectorView = { type : 'SongPatternEditNameSelectorView',
+                                        model : 'song',
+                                        contains : 'SongPatternEditSelectNameView',
+                                        init : function (model) {
+    var selected = true;
+    this.song.map(function (pattern) {
+        this.add(new View(SongPatternEditSelectNameView, pattern, selected));
+        return selected ? (selected = false) : null;
+    }, this);
+    return this.on('selectPattern', function (e) {
+        this.map(function (patternNameView) {
+            return patternNameView.deselect();
+        });
+        return true;
+    });
+},
+                                        render : function () {
+    var html = this.map(function (nameView) {
+        return nameView.$el;
+    });
+    return this.$el.html(html);
+}
+                                      };
+var SongPatternEditSelectView = { type : 'SongPatternEditSelectView',
+                                  model : 'song',
+                                  init : function (model) {
+    return this.create('nameSelector', new View(SongPatternEditNameSelectorView, this.song));
+},
+                                  render : function () {
+    var html = ['Pattern Select', this.nameSelector().$el];
+    return this.$el.html(html);
+}
+                                };
+var SongView = { type : 'SongView',
+                 model : 'song',
+                 init : function (model) {
+    this.create('currentPattern');
+    this.create('patternEditor');
+    this.create('patternEditSelect', new View(SongPatternEditSelectView, this.song));
+    this.on('change:currentPattern', function (e) {
+        this.set('patternEditor', new View(PatternView, this.currentPattern()));
+        return this.render();
+    });
+    this.set('currentPattern', this.song.at(0));
+    return this.on('selectPattern', function (e) {
+        return this.currentPattern(e.value);
+    });
+},
+                 render : function () {
+    var html = [this.patternEditSelect().$el, this.patternEditor().$el];
+    return this.$el.html(html);
+}
+               };
 /* (DEFVIEW *MINIBUFFER-VIEW MODEL app RENDER
     (LAMBDA ()
       ((@ THIS $EL HTML) <input class='MinibufferEditorView' type='text'>))) */
@@ -574,28 +649,6 @@ var MinibufferView = { type : 'MinibufferView',
     return this.$el.html('<input class=\'MinibufferEditorView\' type=\'text\'>');
 }
                      };
-/* (DEFVIEW *SONG-VIEW MODEL song CONTAINS '*PATTERN-VIEW INIT
-    (LAMBDA (MODEL)
-      ((@ THIS SONG EACH)
-       (LAMBDA (PATTERN) (THIS.ADD (NEW (*VIEW *PATTERN-VIEW PATTERN)))) THIS))
-    RENDER
-    (LAMBDA ()
-      ((@ THIS $EL HTML)
-       (THIS.MAP (LAMBDA (PATTERN-VIEW) (@ PATTERN-VIEW $EL)))))) */
-var SongView = { type : 'SongView',
-                 model : 'song',
-                 contains : 'PatternView',
-                 init : function (model) {
-    return this.song.each(function (pattern) {
-        return this.add(new View(PatternView, pattern));
-    }, this);
-},
-                 render : function () {
-    return this.$el.html(this.map(function (patternView) {
-        return patternView.$el;
-    }));
-}
-               };
 /* (DEFVIEW *APP-VIEW MODEL app CONTAINS '*SONG-VIEW INIT
     (LAMBDA (MODEL)
       (THIS.CREATE 'MINIBUFFER (NEW (*VIEW *MINIBUFFER-VIEW THIS.APP)))

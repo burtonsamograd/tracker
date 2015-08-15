@@ -58,6 +58,7 @@
            (setf (@ this model-value-fn) model-value-fn)
            (setf (@ this class-name) class-name)
            (setf this.width (or width 8))
+           (this.model.on 'change (@ this end-edit) this)
            ((@ this end-edit))
            )
 

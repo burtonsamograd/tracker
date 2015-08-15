@@ -92,6 +92,7 @@ defview(HexValueEditView, init, function (model, className, modelValueFn, width)
       (SETF (@ THIS MODEL-VALUE-FN) MODEL-VALUE-FN)
       (SETF (@ THIS CLASS-NAME) CLASS-NAME)
       (SETF THIS.WIDTH (OR WIDTH 8))
+      (THIS.MODEL.ON 'CHANGE (@ THIS END-EDIT) THIS)
       ((@ THIS END-EDIT)))
     INITIAL-EVENTS (CREATE DBLCLICK (LAMBDA (E) (THIS.EDIT))) EDIT-EVENTS
     (CREATE KEYPRESS
@@ -129,6 +130,7 @@ defview(StringValueEditView, init, function (model, className, modelValueFn, wid
     this.modelValueFn = modelValueFn;
     this.className = className;
     this.width = width || 8;
+    this.model.on('change', this.endEdit, this);
     return this.endEdit();
 }, initialEvents, { 'dblclick' : function (e) {
     return this.edit();
