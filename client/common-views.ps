@@ -1,24 +1,5 @@
 ;; -*- mode: lisp -*-
 
-(defview *Two-character-hex-value-edit-view
-    tag-name "input type='text' maxlength='2' size='2'"
-    init (lambda (model model-value-fn)
-           (setf (@ this model-value-fn) model-value-fn)
-           (this.$el.val ((@ (or ((@ model-value-fn call) this.model) "") to-string) 16)))
-    events (create
-            :keypress (lambda (e)
-                        (if (= (@ e key-code) 13)
-                            (this.finished)))
-
-            :focusout (lambda (e)
-                    (this.finished)))
-    finished (lambda (silent)
-               (let ((value (parse-int (+ "0x" (this.$el.val)))))
-                 (unless ((eval "isNaN") value) ;; eval hack due to symbol conversion
-                   ((@ this model-value-fn call) this.note value)))
-               (unless silent
-                 (this.trigger :end-edit this))))
-
 (defview *Hex-value-edit-view
     init (lambda (model class-name model-value-fn width)
            (setf (@ this model-value-fn) model-value-fn)
@@ -69,5 +50,50 @@
                (let ((value (parse-int (+ "0x" ((@ this input val))))))
                  (unless ((eval "isNaN") value) ;; eval hack due to symbol conversion
                    ((@ this model-value-fn call) this.model value)))
+               ((@ this end-edit))))
+
+
+(defview *String-value-edit-view
+    init (lambda (model class-name model-value-fn width)
+           (setf (@ this model-value-fn) model-value-fn)
+           (setf (@ this class-name) class-name)
+           (setf this.width (or width 8))
+           ((@ this end-edit))
+           )
+
+    initial-events (create
+                    :dblclick (lambda (e)
+                                (this.edit)))
+    edit-events (create
+                 :keypress (lambda (e)
+                             (if (= (@ e key-code) 13)
+                                 (this.finished)))
+                 
+                 :blur (lambda (e)
+                             (this.finished)))
+
+    edit (lambda ()
+           (let ((input ($ (+ "<input type='text' maxlength='"
+                              this.width "' size='" this.width "'/>"))))
+             ((@ input val) (or ((@ (@ this model-value-fn) call) this.model) ""))
+             (for-in (event (@ this edit-events))
+                     ((@ input bind) event ((@ (getprop (@ this edit-events) event) bind) this)))
+             ((@ this $el html) input)
+             ((@ input focus))
+             ((@ input select))
+             (setf this.input input)
+             ))
+    
+    end-edit (lambda ()
+               ((@ this $el text) ((@ (@ this model-value-fn) call) this.model))
+               ((@ this $el attr) :class (@ this class-name))
+               (for-in (event (@ this initial-events))
+                       ((@ this $el bind) event ((@ (getprop (@ this initial-events)
+                                                             event) bind) this)))
+               (setf (@ this input) nil)
+               )
+
+    finished (lambda (silent)
+               ((@ this model-value-fn call) this.model ((@ this input val)))
                ((@ this end-edit))))
 

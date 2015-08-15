@@ -130,25 +130,6 @@ var App = { type : 'App',
 }
           };
 /* (LOAD common-views.ps) */
-var TwoCharacterHexValueEditView = { type : 'TwoCharacterHexValueEditView',
-                                     tagName : 'input type=\'text\' maxlength=\'2\' size=\'2\'',
-                                     init : function (model, modelValueFn) {
-    this.modelValueFn = modelValueFn;
-    return this.$el.val((modelValueFn.call(this.model) || '').toString(16));
-},
-                                     events : { 'keypress' : function (e) {
-    return e.keyCode === 13 ? this.finished() : null;
-}, 'focusout' : function (e) {
-    return this.finished();
-} },
-                                     finished : function (silent) {
-    var value = parseInt('0x' + this.$el.val());
-    if (!eval('isNaN')(value)) {
-        this.modelValueFn.call(this.note, value);
-    };
-    return !silent ? this.trigger('end-edit', this) : null;
-}
-                                   };
 var HexValueEditView = { type : 'HexValueEditView',
                          init : function (model, className, modelValueFn, width) {
     this.modelValueFn = modelValueFn;
@@ -195,6 +176,45 @@ var HexValueEditView = { type : 'HexValueEditView',
     return this.endEdit();
 }
                        };
+var StringValueEditView = { type : 'StringValueEditView',
+                            init : function (model, className, modelValueFn, width) {
+    this.modelValueFn = modelValueFn;
+    this.className = className;
+    this.width = width || 8;
+    return this.endEdit();
+},
+                            initialEvents : { 'dblclick' : function (e) {
+    return this.edit();
+} },
+                            editEvents : { 'keypress' : function (e) {
+    return e.keyCode === 13 ? this.finished() : null;
+}, 'blur' : function (e) {
+    return this.finished();
+} },
+                            edit : function () {
+    var input = $('<input type=\'text\' maxlength=\'' + this.width + '\' size=\'' + this.width + '\'/>');
+    input.val(this.modelValueFn.call(this.model) || '');
+    for (var event in this.editEvents) {
+        input.bind(event, this.editEvents[event].bind(this));
+    };
+    this.$el.html(input);
+    input.focus();
+    input.select();
+    return this.input = input;
+},
+                            endEdit : function () {
+    this.$el.text(this.modelValueFn.call(this.model));
+    this.$el.attr('class', this.className);
+    for (var event in this.initialEvents) {
+        this.$el.bind(event, this.initialEvents[event].bind(this));
+    };
+    return this.input = null;
+},
+                            finished : function (silent) {
+    this.modelValueFn.call(this.model, this.input.val());
+    return this.endEdit();
+}
+                          };
 /* (LOAD note-view.ps) */
 var NoteView = { type : 'NoteView',
                  model : 'note',
@@ -346,15 +366,6 @@ var ChannelNameEditView = { type : 'ChannelNameEditView',
     return this.trigger('end-edit-name', this);
 }
                           };
-var ChannelNameView = { type : 'ChannelNameView',
-                        model : 'channel',
-                        events : { 'click' : function (e) {
-    return this.trigger('edit-name');
-} },
-                        render : function () {
-    return this.$el.text(this.channel.name());
-}
-                      };
 var ChannelView = { type : 'ChannelView',
                     model : 'channel',
                     events : { 'mousedown' : function (e) {
@@ -365,20 +376,10 @@ var ChannelView = { type : 'ChannelView',
 } },
                     init : function (model) {
     this.create('titleView', new View(ChannelTitleView, this.channel));
-    this.create('nameView', new View(ChannelNameView, this.channel));
+    this.create('nameView', new View(StringValueEditView, this.channel, 'ChannelNameView', this.channel.name));
     this.create('controlsView', new View(ChannelControlsView, this.channel));
     this.create('monitorView', new View(ChannelMonitorView));
     this.create('selected', false);
-    this.on('edit-name', function (e) {
-        this.nameView(new View(ChannelNameEditView, this.channel, this.channel.name));
-        this.render();
-        this.nameView().$el.focus();
-        return this.nameView().$el.select();
-    });
-    this.on('end-edit-name', function (e) {
-        this.nameView(new View(ChannelNameView, this.channel));
-        return this.render();
-    });
     return this.on('change:selected', function (e) {
         return this.$el.toggleClass('ChannelSelected');
     });

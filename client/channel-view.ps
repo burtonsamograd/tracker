@@ -129,14 +129,6 @@
                 (or (this.$el.val) (this.channel.index)))
                (this.trigger :end-edit-name this)))
 
-(defview *Channel-name-view
-    model 'channel
-    events (create
-            'click (lambda (e)
-                     (this.trigger :edit-name)))
-    render (lambda ()
-             (this.$el.text (this.channel.name))))
-
 (defview *Channel-view
     model 'channel
     events (create
@@ -148,24 +140,11 @@
 
     init (lambda (model)
            (this.create 'title-view (new (*View *Channel-title-view this.channel)))
-           (this.create 'name-view (new (*View *Channel-name-view this.channel)))
+           (this.create 'name-view (new (*View *String-value-edit-view this.channel
+                                               "ChannelNameView" this.channel.name)))
            (this.create 'controls-view (new (*View *Channel-controls-view this.channel)))
            (this.create 'monitor-view (new (*View *Channel-monitor-view)))
            (this.create 'selected f)
-           (this.on :edit-name (lambda (e)
-                                 ((@ this name-view)
-                                  (new (*View *Channel-name-edit-view
-                                              this.channel
-                                              this.channel.name)))
-                                 (this.render)
-                                 ((@ (@ ((@ this name-view)) $el) focus))
-                                 ((@ (@ ((@ this name-view)) $el) select))
-                                 ))
-           (this.on :end-edit-name (lambda (e)
-                                     ((@ this name-view)
-                                      (new (*View *Channel-name-view
-                                                  this.channel)))
-                                     (this.render)))
            (this.on "change:selected" (lambda (e)
                                         ((@ this $el toggle-class) "ChannelSelected"))))
     render (lambda ()
