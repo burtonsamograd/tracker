@@ -1,6 +1,6 @@
 ;; -*- mode: lisp -*-
 
-(defview *Pattern-view
+(defview *Pattern-edit-view
     model "pattern"
     contains "ChannelView"
 
@@ -70,3 +70,25 @@
              (this.$el.html (this.map
                              (lambda (channel-view)
                                (@ channel-view $el))))))
+
+(defview *Pattern-mode-line-view
+    model "pattern"
+    init (lambda (model)
+           (this.pattern.on "change:name" this.render this))
+    render (lambda ()
+             ((@ this $el html) ((@ this pattern name)))))
+
+(defview *Pattern-view
+    model "pattern"
+    init (lambda (model)
+           (this.create 'editor (new (*View *Pattern-edit-view this.pattern)))
+           (this.create 'mode-line (new (*View *Pattern-mode-line-view this.pattern)))
+           )
+
+    render (lambda ()
+             (let ((html (array
+                          (@ ((@ this editor)) $el)
+                          (@ ((@ this mode-line)) $el)
+                          )))
+               ((@ this $el html) html))))
+    

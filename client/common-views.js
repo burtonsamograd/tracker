@@ -45,7 +45,7 @@ defview(TwoCharacterHexValueEditView, tagName, 'input type=\'text\' maxlength=\'
      (LAMBDA (E)
        (IF (= (@ E KEY-CODE) 13)
            (THIS.FINISHED)))
-     FOCUSOUT (LAMBDA (E) (THIS.FINISHED)))
+     BLUR (LAMBDA (E) (THIS.FINISHED)))
     EDIT
     (LAMBDA ()
       (LET ((INPUT
@@ -91,7 +91,7 @@ defview(HexValueEditView, init, function (model, className, modelValueFn, width)
     return this.edit();
 } }, editEvents, { 'keypress' : function (e) {
     return e.keyCode === 13 ? this.finished() : null;
-}, 'focusout' : function (e) {
+}, 'blur' : function (e) {
     return this.finished();
 } }, edit, function () {
     var input = $('<input type=\'text\' maxlength=\'' + this.width + '\' size=\'' + this.width + '\'/>');

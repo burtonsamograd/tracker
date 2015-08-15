@@ -19,12 +19,12 @@
            
            (this.on "change:selected"
                     (lambda (e)
-                      (if e.value
+                      (if ((@ this selected))
                           ((@ (@ this $el) add-class) "NoteViewSelected")
                           ((@ (@ this $el) remove-class) "NoteViewSelected")))))
     render (lambda ()            
              (this.$el.html (array
-                             ((@ ((@ this pitch-view)) render))
-                             ((@ ((@ this fx-view)) render))
-                             ((@ ((@ this arg-view)) render))
-                             ((@ ((@ this instrument-view)) render))))))
+                             (@ ((@ this pitch-view)) $el)
+                             (@ ((@ this fx-view)) $el)
+                             (@ ((@ this arg-view)) $el)
+                             (@ ((@ this instrument-view)) $el)))))

@@ -26,10 +26,9 @@
            (this.add (new (*Class *Note))))))
 
 (defcontainer *Pattern *Channel
-  init (lambda (index name size)
+  init (lambda (name size)
+         (this.create :name name)
          (this.create :size (or size default-num-channels))
-         (this.create :index index)
-         (this.create :name (or name index))
          (dotimes (i (this.size))
            (this.add (new (*Class *Channel i))))
 
@@ -57,23 +56,58 @@
          ))
 
 (defcontainer *Song *Pattern
-  init (lambda (name name)
-         (this.create :size (or size 1))
-         (this.create :name (or name index))))
+  init (lambda (name size)
+         (this.create 'size (or size 1))
+         (this.create 'name (or name index))
+         (dotimes (i ((@ this size)))
+           (this.add (new (*Class *Pattern i))))))
+
+(defcontainer *App *Song
+  init (lambda (name)
+         (this.create 'name (or name "untitled"))
+         (this.add (new (*Class *Song ((@ this name)))))))
 
 (load "common-views.ps")
 (load "note-view.ps")
 (load "channel-view.ps")
-(load "pattern-edit-view.ps")
+(load "pattern-view.ps")
 
+(defview *Minibuffer-view
+    model "app"
+    render (lambda ()
+             ((@ this $el html) "<input class='MinibufferEditorView' type='text'>")))
+
+
+(defview *Song-view
+    model "song"
+    contains '*Pattern-view
+    init (lambda (model)
+           ((@ this song each) (lambda (pattern)
+                                 (this.add (new (*View *Pattern-view pattern)))) this))
+
+    render (lambda ()
+             ((@ this $el html) (this.map (lambda (pattern-view)
+                                            (@ pattern-view $el))))))
+
+(defview *App-view
+    model "app"
+    contains '*Song-view
+    init (lambda (model)
+           (this.create 'minibuffer (new (*View *Minibuffer-view this.app)))
+           (this.create 'song (new (*View *Song-view ((@ this app at) 0)))))
+    render (lambda ()
+             (let ((html (array
+                          (@ ((@ this song)) $el)
+                          (@ ((@ this minibuffer)) $el))))
+               ((@ this $el html) html))))
+
+(defvar app (new (*Class *App)))
 ((@ ($ document) ready)
  (lambda ()
-   (let* ((note (new (*Class *Note)))
-          (pattern (new (*Class *Pattern 0)))
-          (note-view (new (*View *Note-view note)))
-          (pattern-view (new (*View *Pattern-view pattern))))
-     ((@ ($ 'body) html) ((@ pattern-view render)))
+   (let ((app-view (new (*View *App-view app))))
+     ((@ ($ 'body) html) (@ app-view $el))
+     ((@ ($ document) bind) 'click (lambda (e)
+                                    ((@ ($ ".MinibufferEditorView") select)))))))
 ;     ((@ ($ document) bind) 'keydown (lambda (e)
 ;                                       (console.log (@ e char-code))))
-     )))
    

@@ -51,10 +51,9 @@ var Channel = { type : 'Channel',
 }
               };
 /* (DEFCONTAINER *PATTERN *CHANNEL INIT
-    (LAMBDA (INDEX NAME SIZE)
+    (LAMBDA (NAME SIZE)
+      (THIS.CREATE NAME NAME)
       (THIS.CREATE SIZE (OR SIZE DEFAULT-NUM-CHANNELS))
-      (THIS.CREATE INDEX INDEX)
-      (THIS.CREATE NAME (OR NAME INDEX))
       (DOTIMES (I (THIS.SIZE)) (THIS.ADD (NEW (*CLASS *CHANNEL I))))
       (THIS.ON CLOSE-CHANNEL (LAMBDA (E) (THIS.REMOVE E.VALUE)))
       (THIS.ON ADD-CHANNEL
@@ -77,10 +76,9 @@ var Channel = { type : 'Channel',
                (THIS.SWAP I (1+ I)))))))) */
 var Pattern = { type : 'Pattern',
                 contains : 'Channel',
-                init : function (index, name, size) {
+                init : function (name, size) {
+    this.create('name', name);
     this.create('size', size || defaultNumChannels);
-    this.create('index', index);
-    this.create('name', name || index);
     for (var i = 0; i < this.size(); i += 1) {
         this.add(new Class(Channel, i));
     };
@@ -106,16 +104,31 @@ var Pattern = { type : 'Pattern',
 }
               };
 /* (DEFCONTAINER *SONG *PATTERN INIT
-    (LAMBDA (NAME NAME)
-      (THIS.CREATE SIZE (OR SIZE 1))
-      (THIS.CREATE NAME (OR NAME INDEX)))) */
+    (LAMBDA (NAME SIZE)
+      (THIS.CREATE 'SIZE (OR SIZE 1))
+      (THIS.CREATE 'NAME (OR NAME INDEX))
+      (DOTIMES (I ((@ THIS SIZE))) (THIS.ADD (NEW (*CLASS *PATTERN I)))))) */
 var Song = { type : 'Song',
              contains : 'Pattern',
-             init : function (name, name) {
+             init : function (name, size) {
     this.create('size', size || 1);
-    return this.create('name', name || index);
+    this.create('name', name || index);
+    for (var i = 0; i < this.size(); i += 1) {
+        this.add(new Class(Pattern, i));
+    };
 }
            };
+/* (DEFCONTAINER *APP *SONG INIT
+    (LAMBDA (NAME)
+      (THIS.CREATE 'NAME (OR NAME untitled))
+      (THIS.ADD (NEW (*CLASS *SONG ((@ THIS NAME))))))) */
+var App = { type : 'App',
+            contains : 'Song',
+            init : function (name) {
+    this.create('name', name || 'untitled');
+    return this.add(new Class(Song, this.name()));
+}
+          };
 /* (LOAD common-views.ps) */
 var TwoCharacterHexValueEditView = { type : 'TwoCharacterHexValueEditView',
                                      tagName : 'input type=\'text\' maxlength=\'2\' size=\'2\'',
@@ -152,7 +165,7 @@ var HexValueEditView = { type : 'HexValueEditView',
 } },
                          editEvents : { 'keypress' : function (e) {
     return e.keyCode === 13 ? this.finished() : null;
-}, 'focusout' : function (e) {
+}, 'blur' : function (e) {
     return this.finished();
 } },
                          edit : function () {
@@ -195,11 +208,11 @@ var NoteView = { type : 'NoteView',
     this.create('instrumentView', new View(HexValueEditView, this.channel, 'NoteInstrumentView', this.note.instrument));
     this.create('selected');
     return this.on('change:selected', function (e) {
-        return e.value ? this.$el.addClass('NoteViewSelected') : this.$el.removeClass('NoteViewSelected');
+        return this.selected() ? this.$el.addClass('NoteViewSelected') : this.$el.removeClass('NoteViewSelected');
     });
 },
                  render : function () {
-    return this.$el.html([this.pitchView().render(), this.fxView().render(), this.argView().render(), this.instrumentView().render()]);
+    return this.$el.html([this.pitchView().$el, this.fxView().$el, this.argView().$el, this.instrumentView().$el]);
 }
                };
 /* (LOAD channel-view.ps) */
@@ -389,11 +402,11 @@ var ChannelView = { type : 'ChannelView',
     return this.$el.html(html);
 }
                   };
-/* (LOAD pattern-edit-view.ps) */
-var PatternView = { type : 'PatternView',
-                    model : 'pattern',
-                    contains : 'ChannelView',
-                    init : function () {
+/* (LOAD pattern-view.ps) */
+var PatternEditView = { type : 'PatternEditView',
+                        model : 'pattern',
+                        contains : 'ChannelView',
+                        init : function () {
     this.pattern.each(function (channel) {
         var view = new View(ChannelView, channel);
         this.add(view);
@@ -421,21 +434,21 @@ var PatternView = { type : 'PatternView',
     }, this);
     return this.pattern.on('modified', this.rebuildViews, this);
 },
-                    addView : function () {
+                        addView : function () {
     var i = this.pattern.indexOf(this.added);
     var view = new View(ChannelView, this.added);
     this.insertAt(i, view);
     view.render();
     return this.added = null;
 },
-                    removeView : function () {
+                        removeView : function () {
     var view = this.find(function (channelView) {
         return channelView.channel === this.removed;
     });
     this.remove(view);
     return this.removed = null;
 },
-                    reorderViews : function () {
+                        reorderViews : function () {
     var views = this.map(function (e) {
         return e;
     });
@@ -450,7 +463,7 @@ var PatternView = { type : 'PatternView',
         };
     });
 },
-                    rebuildViews : function (e) {
+                        rebuildViews : function (e) {
     if (this.added) {
         this.addView();
     } else {
@@ -462,23 +475,96 @@ var PatternView = { type : 'PatternView',
     };
     return this.render();
 },
-                    render : function () {
+                        render : function () {
     return this.$el.html(this.map(function (channelView) {
         return channelView.$el;
     }));
 }
+                      };
+var PatternModeLineView = { type : 'PatternModeLineView',
+                            model : 'pattern',
+                            init : function (model) {
+    return this.pattern.on('change:name', this.render, this);
+},
+                            render : function () {
+    return this.$el.html(this.pattern.name());
+}
+                          };
+var PatternView = { type : 'PatternView',
+                    model : 'pattern',
+                    init : function (model) {
+    this.create('editor', new View(PatternEditView, this.pattern));
+    return this.create('modeLine', new View(PatternModeLineView, this.pattern));
+},
+                    render : function () {
+    var html = [this.editor().$el, this.modeLine().$el];
+    return this.$el.html(html);
+}
                   };
+/* (DEFVIEW *MINIBUFFER-VIEW MODEL app RENDER
+    (LAMBDA ()
+      ((@ THIS $EL HTML) <input class='MinibufferEditorView' type='text'>))) */
+var MinibufferView = { type : 'MinibufferView',
+                       model : 'app',
+                       render : function () {
+    return this.$el.html('<input class=\'MinibufferEditorView\' type=\'text\'>');
+}
+                     };
+/* (DEFVIEW *SONG-VIEW MODEL song CONTAINS '*PATTERN-VIEW INIT
+    (LAMBDA (MODEL)
+      ((@ THIS SONG EACH)
+       (LAMBDA (PATTERN) (THIS.ADD (NEW (*VIEW *PATTERN-VIEW PATTERN)))) THIS))
+    RENDER
+    (LAMBDA ()
+      ((@ THIS $EL HTML)
+       (THIS.MAP (LAMBDA (PATTERN-VIEW) (@ PATTERN-VIEW $EL)))))) */
+var SongView = { type : 'SongView',
+                 model : 'song',
+                 contains : 'PatternView',
+                 init : function (model) {
+    return this.song.each(function (pattern) {
+        return this.add(new View(PatternView, pattern));
+    }, this);
+},
+                 render : function () {
+    return this.$el.html(this.map(function (patternView) {
+        return patternView.$el;
+    }));
+}
+               };
+/* (DEFVIEW *APP-VIEW MODEL app CONTAINS '*SONG-VIEW INIT
+    (LAMBDA (MODEL)
+      (THIS.CREATE 'MINIBUFFER (NEW (*VIEW *MINIBUFFER-VIEW THIS.APP)))
+      (THIS.CREATE 'SONG (NEW (*VIEW *SONG-VIEW ((@ THIS APP AT) 0)))))
+    RENDER
+    (LAMBDA ()
+      (LET ((HTML
+             (ARRAY (@ ((@ THIS SONG)) $EL) (@ ((@ THIS MINIBUFFER)) $EL))))
+        ((@ THIS $EL HTML) HTML)))) */
+var AppView = { type : 'AppView',
+                model : 'app',
+                contains : 'SongView',
+                init : function (model) {
+    this.create('minibuffer', new View(MinibufferView, this.app));
+    return this.create('song', new View(SongView, this.app.at(0)));
+},
+                render : function () {
+    var html = [this.song().$el, this.minibuffer().$el];
+    return this.$el.html(html);
+}
+              };
+/* (DEFVAR APP (NEW (*CLASS *APP))) */
+var app = new Class(App);
 /* ((@ ($ DOCUMENT) READY)
     (LAMBDA ()
-      (LET* ((NOTE (NEW (*CLASS *NOTE)))
-             (PATTERN (NEW (*CLASS *PATTERN 0)))
-             (NOTE-VIEW (NEW (*VIEW *NOTE-VIEW NOTE)))
-             (PATTERN-VIEW (NEW (*VIEW *PATTERN-VIEW PATTERN))))
-        ((@ ($ 'BODY) HTML) ((@ PATTERN-VIEW RENDER)))))) */
+      (LET ((APP-VIEW (NEW (*VIEW *APP-VIEW APP))))
+        ((@ ($ 'BODY) HTML) (@ APP-VIEW $EL))
+        ((@ ($ DOCUMENT) BIND) 'CLICK
+         (LAMBDA (E) ((@ ($ .MinibufferEditorView) SELECT))))))) */
 $(document).ready(function () {
-    var note = new Class(Note);
-    var pattern = new Class(Pattern, 0);
-    var noteView = new View(NoteView, note);
-    var patternView = new View(PatternView, pattern);
-    return $('body').html(patternView.render());
+    var appView = new View(AppView, app);
+    $('body').html(appView.$el);
+    return $(document).bind('click', function (e) {
+        return $('.MinibufferEditorView').select();
+    });
 });

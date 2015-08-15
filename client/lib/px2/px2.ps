@@ -93,12 +93,13 @@
   (if (not ((@ this _props has-own-property) name))
       (throw (new (*Error (+ "Attempt to set a property " name " that does not exist.")))))
 
-  (unless silent
-    (trigger this 
-             :change value
-             (+ :change ":" name) value))
-  (add-parent value this name)
-  (setf (getprop this '_props name) value))
+  (let ((old-value (getprop this '_props name)))
+    (setf (getprop this '_props name) value)
+    (unless silent
+      (trigger this 
+               :change old-value
+               (+ :change ":" name) old-value))
+    (add-parent value this name)))
 
 (defmethod *Class destroy (name)
   (let ((value (getprop this '_props name)))
@@ -192,6 +193,8 @@
   (let ((retval ((@ this _storage remove) obj)))
     (when retval
       (decf (@ this length))
+      (when (*Classp obj)
+        ((@ obj _parents remove) this))
       (unless silent
         (trigger this
                  :remove obj
@@ -202,6 +205,9 @@
   (let ((old-storage (@ this _storage)))
     (setf (@ this _storage) (array)
           (@ this length) 0)
+    (dolist (thing old-storage)
+      (when (*Classp thing)
+        ((@ thing _parents remove) this)))
     (unless silent
       (trigger this
                :clear this
@@ -272,11 +278,15 @@
 
     ((@ this $el attr) :class (or (@ options class-name) (@ options type)))
 
+    ;; Add a default render function if none was provided
     (unless (@ options render)
       (if (@ options render-augmented)
           (setf (@ this render) (@ options render-augmented))
           (setf (@ this render) (lambda ()
                                   (@ this $el)))))
+
+    ;; Augment the render function to automatically detach children
+    ;; (keeps event handlers from being lost)
     (when (@ options render)
       (unless (@ options render-augmented)
         (progn
@@ -287,6 +297,24 @@
           (setf (@ options render-augmented) (@ this render))
           (setf (@ options original-render) (@ options render))
           (delete (@ options render)))))
+
+    ;; Augment the init function to automatically call this.render() for Views
+    ;; or give a default init that calls render if none was provided
+    (unless (@ options init)
+      (if (@ options init-augmented)
+          (setf (@ this init) (@ options init-augmented))
+          (setf (@ this init) (lambda () (this.render)))))
+
+    (when (@ options init)
+      (unless (@ options init-augmented)
+        (progn
+          (setf (@ this init)
+                (lambda ()
+                  ((@ (@ options original-init) apply) this arguments)
+                  ((@ this render))))
+          (setf (@ options init-augmented) (@ this init))
+          (setf (@ options original-init) (@ options init))
+          (delete (@ options init)))))
       
     (when (@ options events)
       (for-in (event (@ options events))
