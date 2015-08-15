@@ -71,12 +71,41 @@
                              (lambda (channel-view)
                                (@ channel-view $el))))))
 
+(defview *Pattern-name-view
+    model "pattern"
+    init (lambda (model)
+           (this.create 'edit (new (*View *String-value-edit-view
+                                          this.pattern
+                                          "PatternNameEditView" this.pattern.name 32))))
+    render (lambda ()
+             (let ((html (array
+                          "Name: "
+                          (@ ((@ this edit)) $el))))
+               ((@ this $el html) html))))
+
+(defview *Pattern-size-view
+    model "pattern"
+    init (lambda (model)
+           (this.create 'edit (new (*View *Hex-value-edit-view
+                                          this.pattern
+                                          "PatternSizeEditView" this.pattern.size))))
+    render (lambda ()
+             (let ((html (array
+                          "Size: "
+                          (@ ((@ this edit)) $el))))
+               ((@ this $el html) html))))
+
 (defview *Pattern-mode-line-view
     model "pattern"
     init (lambda (model)
-           (this.pattern.on "change:name" this.render this))
+           (this.create 'name (new (*View *Pattern-name-view this.pattern)))
+           (this.create 'size (new (*View *Pattern-size-view this.pattern))))
+
     render (lambda ()
-             ((@ this $el html) ((@ this pattern name)))))
+             (let ((html (array
+                          (@ ((@ this name)) $el)
+                          (@ ((@ this size)) $el))))
+             ((@ this $el html) html))))
 
 (defview *Pattern-view
     model "pattern"

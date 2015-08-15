@@ -94,6 +94,7 @@
                )
 
     finished (lambda (silent)
-               ((@ this model-value-fn call) this.model ((@ this input val)))
+               ((@ this model-value-fn call) this.model (or ((@ this input val))
+                                                            "--"))
                ((@ this end-edit))))
 

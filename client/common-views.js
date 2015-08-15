@@ -123,7 +123,7 @@ defview(HexValueEditView, init, function (model, className, modelValueFn, width)
       (SETF (@ THIS INPUT) NIL))
     FINISHED
     (LAMBDA (SILENT)
-      ((@ THIS MODEL-VALUE-FN CALL) THIS.MODEL ((@ THIS INPUT VAL)))
+      ((@ THIS MODEL-VALUE-FN CALL) THIS.MODEL (OR ((@ THIS INPUT VAL)) --))
       ((@ THIS END-EDIT)))) */
 defview(StringValueEditView, init, function (model, className, modelValueFn, width) {
     this.modelValueFn = modelValueFn;
@@ -154,6 +154,6 @@ defview(StringValueEditView, init, function (model, className, modelValueFn, wid
     };
     return this.input = null;
 }, finished, function (silent) {
-    this.modelValueFn.call(this.model, this.input.val());
+    this.modelValueFn.call(this.model, this.input.val() || '--');
     return this.endEdit();
 });

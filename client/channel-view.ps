@@ -112,23 +112,6 @@
                      )))
                (this.$el.html html))))
 
-(defview *Channel-name-edit-view
-    tag-name "input type='text' size='8'"
-    model 'channel
-    init (lambda (model model-value-fn)
-           (setf (@ this model-value-fn) model-value-fn)
-           (this.$el.val ((@ model-value-fn call) this.note)))
-    events (create
-            :keypress (lambda (e)
-                        (if (= (@ e key-code) 13)
-                            (this.finished)))
-            :blur (lambda (e)
-                      (this.finished)))
-    finished (lambda ()
-               ((@ this model-value-fn call) this.note
-                (or (this.$el.val) (this.channel.index)))
-               (this.trigger :end-edit-name this)))
-
 (defview *Channel-view
     model 'channel
     events (create
@@ -141,7 +124,7 @@
     init (lambda (model)
            (this.create 'title-view (new (*View *Channel-title-view this.channel)))
            (this.create 'name-view (new (*View *String-value-edit-view this.channel
-                                               "ChannelNameView" this.channel.name)))
+                                               "ChannelNameView" this.channel.name 12)))
            (this.create 'controls-view (new (*View *Channel-controls-view this.channel)))
            (this.create 'monitor-view (new (*View *Channel-monitor-view)))
            (this.create 'selected f)

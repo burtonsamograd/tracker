@@ -24,10 +24,31 @@ input[type=text] {
 }
 
 .ChannelNameView {
-    width: 8em;
     text-align: center;
 }
 
+.PatternNameView {
+    padding-left: 1em;
+    display: inline-block;
+}
+
+.PatternNameEditView {
+    display: inline-block;
+}
+
+.PatternSizeView {
+    display: inline-block;
+    float: right;
+    padding-right: 1em;
+}
+
+.PatternSizeEditView {
+    display: inline-block;
+}
+
+.ChannelControlsView {
+    padding: .2em;
+}
 .ChannelGainView {
     display: inline;
 }

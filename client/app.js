@@ -13,8 +13,8 @@ function hex(x, len) {
 };
 /* (DEFVAR DEFAULT-NUM-CHANNELS 12) */
 var defaultNumChannels = 12;
-/* (DEFVAR DEFAULT-PATTERN-LENGTH 32) */
-var defaultPatternLength = 32;
+/* (DEFVAR DEFAULT-PATTERN-LENGTH 16) */
+var defaultPatternLength = 16;
 /* (DEFMODEL *NOTE INIT
     (LAMBDA (INSTRUMENT PITCH FX ARG)
       (THIS.CREATE INSTRUMENT INSTRUMENT)
@@ -53,8 +53,9 @@ var Channel = { type : 'Channel',
 /* (DEFCONTAINER *PATTERN *CHANNEL INIT
     (LAMBDA (NAME SIZE)
       (THIS.CREATE NAME NAME)
-      (THIS.CREATE SIZE (OR SIZE DEFAULT-NUM-CHANNELS))
-      (DOTIMES (I (THIS.SIZE)) (THIS.ADD (NEW (*CLASS *CHANNEL I))))
+      (THIS.CREATE SIZE (OR SIZE DEFAULT-PATTERN-LENGTH))
+      (DOTIMES (I DEFAULT-NUM-CHANNELS)
+        (THIS.ADD (NEW (*CLASS *CHANNEL I ((@ THIS SIZE))))))
       (THIS.ON CLOSE-CHANNEL (LAMBDA (E) (THIS.REMOVE E.VALUE)))
       (THIS.ON ADD-CHANNEL
        (LAMBDA (E)
@@ -78,9 +79,9 @@ var Pattern = { type : 'Pattern',
                 contains : 'Channel',
                 init : function (name, size) {
     this.create('name', name);
-    this.create('size', size || defaultNumChannels);
-    for (var i = 0; i < this.size(); i += 1) {
-        this.add(new Class(Channel, i));
+    this.create('size', size || defaultPatternLength);
+    for (var i = 0; i < defaultNumChannels; i += 1) {
+        this.add(new Class(Channel, i, this.size()));
     };
     this.on('close-channel', function (e) {
         return this.remove(e.value);
@@ -211,7 +212,7 @@ var StringValueEditView = { type : 'StringValueEditView',
     return this.input = null;
 },
                             finished : function (silent) {
-    this.modelValueFn.call(this.model, this.input.val());
+    this.modelValueFn.call(this.model, this.input.val() || '--');
     return this.endEdit();
 }
                           };
@@ -349,23 +350,6 @@ var ChannelControlsView = { type : 'ChannelControlsView',
     return this.$el.html(html);
 }
                           };
-var ChannelNameEditView = { type : 'ChannelNameEditView',
-                            tagName : 'input type=\'text\' size=\'8\'',
-                            model : 'channel',
-                            init : function (model, modelValueFn) {
-    this.modelValueFn = modelValueFn;
-    return this.$el.val(modelValueFn.call(this.note));
-},
-                            events : { 'keypress' : function (e) {
-    return e.keyCode === 13 ? this.finished() : null;
-}, 'blur' : function (e) {
-    return this.finished();
-} },
-                            finished : function () {
-    this.modelValueFn.call(this.note, this.$el.val() || this.channel.index());
-    return this.trigger('end-edit-name', this);
-}
-                          };
 var ChannelView = { type : 'ChannelView',
                     model : 'channel',
                     events : { 'mousedown' : function (e) {
@@ -376,7 +360,7 @@ var ChannelView = { type : 'ChannelView',
 } },
                     init : function (model) {
     this.create('titleView', new View(ChannelTitleView, this.channel));
-    this.create('nameView', new View(StringValueEditView, this.channel, 'ChannelNameView', this.channel.name));
+    this.create('nameView', new View(StringValueEditView, this.channel, 'ChannelNameView', this.channel.name, 12));
     this.create('controlsView', new View(ChannelControlsView, this.channel));
     this.create('monitorView', new View(ChannelMonitorView));
     this.create('selected', false);
@@ -482,13 +466,35 @@ var PatternEditView = { type : 'PatternEditView',
     }));
 }
                       };
+var PatternNameView = { type : 'PatternNameView',
+                        model : 'pattern',
+                        init : function (model) {
+    return this.create('edit', new View(StringValueEditView, this.pattern, 'PatternNameEditView', this.pattern.name, 32));
+},
+                        render : function () {
+    var html = ['Name: ', this.edit().$el];
+    return this.$el.html(html);
+}
+                      };
+var PatternSizeView = { type : 'PatternSizeView',
+                        model : 'pattern',
+                        init : function (model) {
+    return this.create('edit', new View(HexValueEditView, this.pattern, 'PatternSizeEditView', this.pattern.size));
+},
+                        render : function () {
+    var html = ['Size: ', this.edit().$el];
+    return this.$el.html(html);
+}
+                      };
 var PatternModeLineView = { type : 'PatternModeLineView',
                             model : 'pattern',
                             init : function (model) {
-    return this.pattern.on('change:name', this.render, this);
+    this.create('name', new View(PatternNameView, this.pattern));
+    return this.create('size', new View(PatternSizeView, this.pattern));
 },
                             render : function () {
-    return this.$el.html(this.pattern.name());
+    var html = [this.name().$el, this.size().$el];
+    return this.$el.html(html);
 }
                           };
 var PatternView = { type : 'PatternView',

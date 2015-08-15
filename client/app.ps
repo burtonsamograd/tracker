@@ -3,7 +3,7 @@
 (load "utils.ps")
 
 (defvar default-num-channels 12)
-(defvar default-pattern-length 32)
+(defvar default-pattern-length 16)
 
 (defmodel *Note
     init (lambda (instrument pitch fx arg)
@@ -28,9 +28,9 @@
 (defcontainer *Pattern *Channel
   init (lambda (name size)
          (this.create :name name)
-         (this.create :size (or size default-num-channels))
-         (dotimes (i (this.size))
-           (this.add (new (*Class *Channel i))))
+         (this.create :size (or size default-pattern-length))
+         (dotimes (i default-num-channels)
+           (this.add (new (*Class *Channel i ((@ this size))))))
 
          (this.on :close-channel
                   (lambda (e)
