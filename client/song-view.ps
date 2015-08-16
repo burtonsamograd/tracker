@@ -53,6 +53,9 @@
            (this.on 'select-pattern (lambda (e)
                                       ((@ this current-pattern) e.value))))
 
+    load-sample (lambda (sample)
+                  ((@ this song load-sample) sample))
+
     render (lambda ()
              (let ((html (array
                           (@ ((@ this song-controls)) $el)

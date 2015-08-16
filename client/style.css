@@ -95,6 +95,10 @@ input[type=text] {
     border-top: 4px solid;
 }
 
+.InstrumentSelectNameView {
+    width: 10em;
+}
+
 .SongPatternEditSelectView {
     vertical-align: top;
     display: table-cell;
@@ -124,6 +128,7 @@ input[type=text] {
 }
 
 .SongPatternIndexView {
+    padding-top: .25em;
     display: inline-block;
     font-size: smaller;
 }
@@ -275,19 +280,20 @@ input[type=text] {
     display: table;
 }
 
-.ToolsSamplerInstrumentListView {
+.ToolsSamplerSampleListView {
     display: table-cell;
     border: 4px solid;
     height: 23.5em;
     width: 12em;
 }
 
-.ToolsSamplerInstrumentView {
+.ToolsSamplerSampleView {
     display: table-cell;
-    border: 4px solid;
     height: 25em;
     width: 50em;
+    padding: .5em;
 }
+
 
 .AppView {
     margin: auto;

@@ -1,0 +1,10 @@
+;; -*- mode: lisp -*-
+
+(defview *Tools-effects-view
+    model 'app
+    class-name "ToolsAreaView"
+    render (lambda ()
+             (let ((html (array
+                          "Effects"
+                          )))
+             ((@ this $el html) html))))

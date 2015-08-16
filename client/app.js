@@ -1,7 +1,5 @@
 /* --eval (DEFCONSTANT +DEBUG+ T)
- *//* (LOAD macros.ps) */
-
-/* (LOAD utils.ps) */
+ */
 function hex(x, len) {
     len = len || 2;
     if (typeof x === 'number') {
@@ -14,11 +12,6 @@ function hex(x, len) {
         return s;
     };
 };
-/* (DEFMODEL *OPTIONS DEFAULTS
-    (CREATE DEFAULT-SONG-NAME untitled DEFAULT-PATTERN-NAME Pattern
-     DEFAULT-CHANNEL-NAME Channel DEFAULT-NUM-CHANNELS 4 DEFAULT-PATTERN-SIZE
-     16 DEFAULT-NUM-PATTERNS 4 DEFAULT-TEMPO 0X80 DEFAULT-TICS-PER-BEAT 6
-     DEFAULT-GAIN 0X80 DEFAULT-PAN 0X80 USER-NAME Dave CONFIRM TRUE)) */
 var Options = { type : 'Options', defaults : { defaultSongName : 'untitled',
                                                defaultPatternName : 'Pattern',
                                                defaultChannelName : 'Channel',
@@ -32,49 +25,37 @@ var Options = { type : 'Options', defaults : { defaultSongName : 'untitled',
                                                userName : 'Dave',
                                                confirm : true
                                              } };
-/* (DEFMODEL *NOTE INIT
-    (LAMBDA (INSTRUMENT PITCH FX ARG)
-      (THIS.CREATE INSTRUMENT INSTRUMENT)
-      (THIS.CREATE PITCH PITCH)
-      (THIS.CREATE FX FX)
-      (THIS.CREATE ARG ARG))) */
+var Sample = { type : 'Sample', init : function (name, uri) {
+    this.create('name', name);
+    this.create('uri', uri);
+    this.create('start', 0);
+    this.create('end', 0);
+    this.create('loop', false);
+    this.create('pingPong', false);
+    return this.create('envelope');
+} };
+var Samples = { type : 'Samples',
+                contains : 'Sample',
+                init : function () {
+    this.on('add', function (e) {
+        return this[e.value.name()] = e.value;
+    });
+    return this.on('remove', function (e) {
+        return delete this[e.value.name()];
+    });
+}
+              };
+var samples = new Class(Samples);
+samples.add(new Class(Sample, 'Sin', '/samples/sin.wav'));
+samples.add(new Class(Sample, 'Saw', '/samples/saw.wav'));
+samples.add(new Class(Sample, 'Square', '/samples/sqr.wav'));
+samples.add(new Class(Sample, 'Triangle', '/samples/tri.wav'));
 var Note = { type : 'Note', init : function (instrument, pitch, fx, arg) {
     this.create('instrument', instrument);
     this.create('pitch', pitch);
     this.create('fx', fx);
     return this.create('arg', arg);
 } };
-/* (DEFCONTAINER *CHANNEL *NOTE INIT
-    (LAMBDA
-        (&OPTIONAL (NAME ((@ OPTIONS DEFAULT-CHANNEL-NAME))) (INDEX 0)
-         (SIZE ((@ OPTIONS DEFAULT-PATTERN-SIZE))))
-      (THIS.CREATE NAME NAME)
-      (THIS.CREATE INDEX INDEX)
-      (THIS.CREATE SIZE SIZE)
-      (THIS.CREATE GAIN 128)
-      (THIS.CREATE PAN 128)
-      (THIS.CREATE MUTE F)
-      (THIS.CREATE SOLO F)
-      (DOTIMES (I (THIS.SIZE)) (THIS.ADD (NEW (*CLASS *NOTE))))
-      (THIS.ON change:size
-       (LAMBDA (E)
-         (LET ((OLD-VALUE E.VALUE) (NEW-VALUE ((@ THIS SIZE))))
-           (IF (> OLD-VALUE NEW-VALUE)
-               (THIS.SHRINK OLD-VALUE NEW-VALUE)
-               (IF (< OLD-VALUE NEW-VALUE)
-                   (THIS.GROW OLD-VALUE NEW-VALUE)))
-           (UNLESS (= OLD-VALUE NEW-VALUE) (THIS.TRIGGER RESIZE))))))
-    SHRINK
-    (LAMBDA (OLD-VALUE NEW-VALUE)
-      (LET ((TO-REMOVE (ARRAY)) (INDEX ((@ THIS SIZE))))
-        (DOTIMES (I (- OLD-VALUE ((@ THIS SIZE))))
-          ((@ TO-REMOVE PUSH) ((@ THIS AT) INDEX))
-          (INCF INDEX))
-        (DOLIST (E TO-REMOVE) (THIS.REMOVE E T))))
-    GROW
-    (LAMBDA (OLD-VALUE NEW-VALUE)
-      (DOTIMES (I (- NEW-VALUE OLD-VALUE))
-        ((@ THIS INSERT-AT) (1- (+ I OLD-VALUE)) (NEW (*CLASS *NOTE)) T)))) */
 var Channel = { type : 'Channel',
                 contains : 'Note',
                 init : function (name, index, size) {
@@ -128,63 +109,6 @@ var Channel = { type : 'Channel',
     };
 }
               };
-/* (DEFCONTAINER *PATTERN *CHANNEL INIT
-    (LAMBDA
-        (&OPTIONAL (NAME ((@ OPTIONS DEFAULT-PATTERN-NAME)))
-         (SIZE ((@ OPTIONS DEFAULT-PATTERN-SIZE)))
-         (NUM-CHANNELS ((@ OPTIONS DEFAULT-NUM-CHANNELS))))
-      (THIS.CREATE NAME NAME)
-      (THIS.CREATE SIZE SIZE)
-      (DOTIMES (I NUM-CHANNELS)
-        (THIS.ADD
-         (NEW
-          (*CLASS *CHANNEL (+ ((@ OPTIONS DEFAULT-CHANNEL-NAME))   I) I
-           ((@ THIS SIZE))))))
-      (THIS.ON CLOSE-CHANNEL
-       (LAMBDA (E)
-         (IF (> THIS.LENGTH 1)
-             (LET ((I ((@ THIS INDEX-OF) E.VALUE)))
-               (THIS.REMOVE E.VALUE)
-               (DO ((J I (INCF J)))
-                   ((= J THIS.LENGTH))
-                 ((@ ((@ THIS AT) J) INDEX) J)))
-             (ALERT
-              (+ I'm sorry  ((@ OPTIONS USER-NAME))
-                 , but you can't delete the last channel.)))))
-      (THIS.ON ADD-CHANNEL
-       (LAMBDA (E)
-         (LET ((I ((@ THIS INDEX-OF) E.VALUE)))
-           ((@ THIS INSERT-AT) (1+ I)
-            (NEW
-             (*CLASS *CHANNEL
-              (+ ((@ OPTIONS DEFAULT-CHANNEL-NAME))   (+ THIS.LENGTH 1)) (1+ I)
-              ((@ THIS SIZE)))))
-           (DO ((J (1+ I) (INCF J)))
-               ((= J THIS.LENGTH))
-             ((@ ((@ THIS AT) J) INDEX) J)))))
-      (THIS.ON COPY-CHANNEL
-       (LAMBDA (E)
-         (LET ((I ((@ THIS INDEX-OF) E.VALUE)) (NEW-CHANNEL (E.VALUE.COPY)))
-           ((@ NEW-CHANNEL INDEX) (1+ I))
-           ((@ THIS INSERT-AT) (1+ I) NEW-CHANNEL)
-           ((@ NEW-CHANNEL NAME) (+ ((@ E.VALUE NAME))  ⎘)))))
-      (THIS.ON MOVE-CHANNEL-LEFT
-       (LAMBDA (E)
-         (LET ((I ((@ THIS INDEX-OF) E.VALUE)))
-           (WHEN (> I 0)
-             (THIS.SWAP I (1- I))
-             ((@ ((@ THIS AT) I) INDEX) I)
-             ((@ E.VALUE INDEX) (1- I))))))
-      (THIS.ON MOVE-CHANNEL-RIGHT
-       (LAMBDA (E)
-         (LET ((I ((@ THIS INDEX-OF) E.VALUE)))
-           (WHEN (< I (- THIS.LENGTH 1))
-             (THIS.SWAP I (1+ I))
-             ((@ ((@ THIS AT) I) INDEX) I)
-             ((@ E.VALUE INDEX) (1+ I))))))
-      (THIS.ON change:size
-       (LAMBDA (E)
-         (THIS.EACH (LAMBDA (CHANNEL) ((@ CHANNEL SIZE) ((@ THIS SIZE))))))))) */
 var Pattern = { type : 'Pattern',
                 contains : 'Channel',
                 init : function (name, size, numChannels) {
@@ -256,57 +180,6 @@ var Pattern = { type : 'Pattern',
     });
 }
               };
-/* (DEFCONTAINER *SONG *PATTERN INIT
-    (LAMBDA
-        (&OPTIONAL (NAME ((@ OPTIONS DEFAULT-SONG-NAME)))
-         (TEMPO ((@ OPTIONS DEFAULT-TEMPO)))
-         (TICS-PER-BEAT ((@ OPTIONS DEFAULT-TICS-PER-BEAT)))
-         (GAIN ((@ OPTIONS DEFAULT-GAIN))) (PAN ((@ OPTIONS DEFAULT-PAN)))
-         (NUM-PATTERNS ((@ OPTIONS DEFAULT-NUM-PATTERNS))))
-      (THIS.CREATE 'NAME NAME)
-      (THIS.CREATE 'TEMPO TEMPO)
-      (THIS.CREATE 'TICS-PER-BEAT TICS-PER-BEAT)
-      (THIS.CREATE 'GAIN GAIN)
-      (THIS.CREATE 'PAN PAN)
-      (THIS.CREATE 'SIZE NUM-PATTERNS)
-      (SETF (@ THIS PATTERN-COUNTER) ((@ THIS SIZE)))
-      (DOTIMES (I ((@ THIS SIZE)))
-        (THIS.ADD
-         (NEW (*CLASS *PATTERN (+ ((@ OPTIONS DEFAULT-PATTERN-NAME))   I))) T))
-      (THIS.ON CLOSE-PATTERN
-       (LAMBDA (E)
-         (IF (> THIS.LENGTH 1)
-             (THIS.REMOVE E.VALUE)
-             (ALERT
-              (+ I'm sorry  ((@ OPTIONS USER-NAME))
-                 , but you can't delete the last pattern.)))))
-      (THIS.ON ADD-PATTERN
-       (LAMBDA (E)
-         (LET ((I ((@ THIS INDEX-OF) E.VALUE)))
-           ((@ THIS INSERT-AT) (1+ I)
-            (NEW
-             (*CLASS *PATTERN
-              (+ ((@ OPTIONS DEFAULT-PATTERN-NAME))
-                 (INCF (@ THIS PATTERN-COUNTER)))))))))
-      (THIS.ON COPY-PATTERN
-       (LAMBDA (E)
-         (LET ((I ((@ THIS INDEX-OF) E.VALUE)) (NEW-PATTERN (E.VALUE.COPY)))
-           ((@ THIS INSERT-AT) (1+ I) NEW-PATTERN)
-           ((@ NEW-PATTERN NAME) (+ ((@ E.VALUE NAME))  ⎘)))))
-      (THIS.ON LINK-PATTERN
-       (LAMBDA (E)
-         (LET ((I ((@ THIS INDEX-OF) E.VALUE)))
-           ((@ THIS INSERT-AT) (1+ I) E.VALUE))))
-      (THIS.ON MOVE-PATTERN-UP
-       (LAMBDA (E)
-         (LET ((I ((@ THIS INDEX-OF) E.VALUE)))
-           (IF (> I 0)
-               (THIS.SWAP I (1- I))))))
-      (THIS.ON MOVE-PATTERN-DOWN
-       (LAMBDA (E)
-         (LET ((I ((@ THIS INDEX-OF) E.VALUE)))
-           (IF (< I (- THIS.LENGTH 1))
-               (THIS.SWAP I (1+ I)))))))) */
 var Song = { type : 'Song',
              contains : 'Pattern',
              init : function (name, tempo, ticsPerBeat, gain, pan, numPatterns) {
@@ -334,41 +207,47 @@ var Song = { type : 'Song',
     this.create('gain', gain);
     this.create('pan', pan);
     this.create('size', numPatterns);
+    this.create('samples', new Class(Samples));
     this.patternCounter = this.size();
     for (var i = 0; i < this.size(); i += 1) {
         this.add(new Class(Pattern, options.defaultPatternName() + ' ' + i), true);
     };
-    this.on('close-pattern', function (e) {
-        return this.length > 1 ? this.remove(e.value) : alert('I\'m sorry ' + options.userName() + ', but you can\'t delete the last pattern.');
-    });
-    this.on('add-pattern', function (e) {
-        var i = this.indexOf(e.value);
-        return this.insertAt(i + 1, new Class(Pattern, options.defaultPatternName() + ' ' + ++this.patternCounter));
-    });
-    this.on('copy-pattern', function (e) {
-        var i = this.indexOf(e.value);
-        var newPattern = e.value.copy();
-        this.insertAt(i + 1, newPattern);
-        return newPattern.name(e.value.name() + ' \u2398');
-    });
-    this.on('link-pattern', function (e) {
-        var i = this.indexOf(e.value);
-        return this.insertAt(i + 1, e.value);
-    });
-    this.on('move-pattern-up', function (e) {
-        var i = this.indexOf(e.value);
-        return i > 0 ? this.swap(i, i - 1) : null;
-    });
-    return this.on('move-pattern-down', function (e) {
-        var i = this.indexOf(e.value);
-        return i < this.length - 1 ? this.swap(i, i + 1) : null;
-    });
+    this.on('close-pattern', this.closePattern);
+    this.on('add-pattern', this.addPattern);
+    this.on('copy-pattern', this.copyPattern);
+    this.on('link-pattern', this.linkPattern);
+    this.on('move-pattern-up', this.movePatternUp);
+    return this.on('move-pattern-down', this.movePatternDown);
+},
+             closePattern : function (e) {
+    return this.length > 1 ? this.remove(e.value) : alert('I\'m sorry ' + options.userName() + ', but you can\'t delete the last pattern.');
+},
+             addPattern : function (e) {
+    var i = this.indexOf(e.value);
+    return this.insertAt(i + 1, new Class(Pattern, options.defaultPatternName() + ' ' + ++this.patternCounter));
+},
+             copyPattern : function (e) {
+    var i = this.indexOf(e.value);
+    var newPattern = e.value.copy();
+    this.insertAt(i + 1, newPattern);
+    return newPattern.name(e.value.name() + ' \u2398');
+},
+             linkPattern : function (e) {
+    var i = this.indexOf(e.value);
+    return this.insertAt(i + 1, e.value);
+},
+             movePatternUp : function (e) {
+    var i = this.indexOf(e.value);
+    return i > 0 ? this.swap(i, i - 1) : null;
+},
+             movePatternDown : function (e) {
+    var i = this.indexOf(e.value);
+    return i < this.length - 1 ? this.swap(i, i + 1) : null;
+},
+             loadSample : function (sample) {
+    return this.samples().add(sample);
 }
            };
-/* (DEFCONTAINER *APP *SONG INIT
-    (LAMBDA ()
-      (THIS.CREATE 'SONG (NEW (*CLASS *SONG)))
-      ((@ THIS ADD) ((@ THIS SONG))))) */
 var App = { type : 'App',
             contains : 'Song',
             init : function () {
@@ -376,7 +255,6 @@ var App = { type : 'App',
     return this.add(this.song());
 }
           };
-/* (LOAD common-views.ps) */
 var HexValueEditView = { type : 'HexValueEditView',
                          init : function (model, className, modelValueFn, width) {
     this.modelValueFn = modelValueFn;
@@ -463,7 +341,6 @@ var StringValueEditView = { type : 'StringValueEditView',
     return this.endEdit();
 }
                           };
-/* (LOAD note-view.ps) */
 var NoteView = { type : 'NoteView',
                  model : 'note',
                  events : { 'click' : function (e) {
@@ -483,7 +360,6 @@ var NoteView = { type : 'NoteView',
     return this.$el.html([this.pitchView().$el, this.fxView().$el, this.argView().$el, this.instrumentView().$el]);
 }
                };
-/* (LOAD channel-view.ps) */
 var ChannelMoveLeftButtonView = { type : 'ChannelMoveLeftButtonView',
                                   model : 'channel',
                                   className : 'TinyButton ',
@@ -650,7 +526,6 @@ var ChannelView = { type : 'ChannelView',
     return this.$el.html(html);
 }
                   };
-/* (LOAD pattern-view.ps) */
 var PatternEditView = { type : 'PatternEditView',
                         model : 'pattern',
                         contains : 'ChannelView',
@@ -769,7 +644,6 @@ var PatternView = { type : 'PatternView',
     return this.$el.html(html);
 }
                   };
-/* (LOAD song-view.ps) */
 var PatternMoveUpButtonView = { type : 'PatternMoveUpButtonView',
                                 model : 'pattern',
                                 className : 'TinyButton ',
@@ -928,10 +802,29 @@ var SongPatternEditSelectView = { type : 'SongPatternEditSelectView',
     return this.$el.html(html);
 }
                                 };
+var InstrumentSelectNameView = { type : 'InstrumentSelectNameView',
+                                 model : 'sample',
+                                 init : function (model, index) {
+    return this.create('index', index);
+},
+                                 render : function () {
+    var html = hex(this.index()) + ': ' + this.sample.name();
+    return this.$el.html(html);
+}
+                               };
 var InstrumentSelectView = { type : 'InstrumentSelectView',
                              model : 'song',
+                             init : function () {
+    return this.song.samples().on('add', this.render, this);
+},
                              render : function () {
-    return this.$el.html('Instrument');
+    var i = -1;
+    var html = this.song.samples().map(function (sample) {
+        ++i;
+        return (new View(InstrumentSelectNameView, sample, i)).$el;
+    });
+    html.unshift('Instruments: ' + hex(this.song.samples().length));
+    return this.$el.html(html);
 }
                            };
 var SongNameView = { type : 'SongNameView',
@@ -1020,12 +913,14 @@ var SongView = { type : 'SongView',
         return this.currentPattern(e.value);
     });
 },
+                 loadSample : function (sample) {
+    return this.song.loadSample(sample);
+},
                  render : function () {
     var html = [this.songControls().$el, this.patternEditSelect().$el, this.patternEditor().$el, this.instrumentSelect().$el];
     return this.$el.html(html);
 }
                };
-/* (LOAD tools-view.ps) */
 var ToolsOpenPanelView = { type : 'ToolsOpenPanelView',
                            model : 'app',
                            className : 'ToolsButtonView',
@@ -1062,6 +957,18 @@ var ToolsSamplerButtonView = { type : 'ToolsSamplerButtonView',
     return this.$el.html(html);
 }
                              };
+var ToolsEffectsButtonView = { type : 'ToolsEffectsButtonView',
+                               model : 'app',
+                               className : 'ToolsButtonView',
+                               tagName : 'span',
+                               events : { 'click' : function (e) {
+    return this.trigger('open-effects', this.app);
+} },
+                               render : function () {
+    var html = ['Effects'];
+    return this.$el.html(html);
+}
+                             };
 var ToolsModularButtonView = { type : 'ToolsModularButtonView',
                                model : 'app',
                                className : 'ToolsButtonView',
@@ -1090,13 +997,19 @@ var ToolsButtonsView = { type : 'ToolsButtonsView',
                          model : 'app',
                          init : function (model) {
     this.create('samplerButton', new View(ToolsSamplerButtonView, this.app));
+    this.create('effectsButton', new View(ToolsEffectsButtonView, this.app));
     this.create('modularButton', new View(ToolsModularButtonView, this.app));
     this.create('notesButton', new View(ToolsNotesButtonView, this.app));
     this.add(this.samplerButton());
+    this.add(this.effectsButton());
     this.add(this.modularButton());
     this.add(this.notesButton());
     this.on('open-sampler', function () {
         this.select(this.samplerButton());
+        return true;
+    });
+    this.on('open-effects', function () {
+        this.select(this.effectsButton());
         return true;
     });
     this.on('open-modular', function () {
@@ -1118,7 +1031,7 @@ var ToolsButtonsView = { type : 'ToolsButtonsView',
     return button.$el.addClass('ToolsButtonSelected');
 },
                          render : function () {
-    var html = [this.samplerButton().$el, this.modularButton().$el, this.notesButton().$el];
+    var html = [this.samplerButton().$el, this.effectsButton().$el, this.modularButton().$el, this.notesButton().$el];
     return this.$el.html(html);
 }
                        };
@@ -1130,17 +1043,74 @@ var ToolsDummyView = { type : 'ToolsDummyView',
     return this.$el.html(html);
 }
                      };
-var ToolsSamplerInstrumentListView = { type : 'ToolsSamplerInstrumentListView', model : 'app' };
-var ToolsSamplerInstrumentView = { type : 'ToolsSamplerInstrumentView', model : 'app' };
+var ToolsSamplerSampleListSampleNameView = { type : 'ToolsSamplerSampleListSampleNameView',
+                                             model : 'sample',
+                                             init : function (model) {
+    return null;
+},
+                                             render : function () {
+    var html = this.sample.name();
+    return this.$el.html(html);
+}
+                                           };
+var ToolsSamplerSampleListSampleView = { type : 'ToolsSamplerSampleListSampleView',
+                                         model : 'sample',
+                                         events : { 'click' : function (e) {
+    return this.trigger('select-sample', this.sample);
+}, 'dblclick' : function (e) {
+    return this.trigger('load-sample', this.sample);
+} },
+                                         init : function (model) {
+    return this.create('name', new View(ToolsSamplerSampleListSampleNameView, model));
+},
+                                         render : function () {
+    var html = this.name().$el;
+    return this.$el.html(html);
+}
+                                       };
+var ToolsSamplerSampleListView = { type : 'ToolsSamplerSampleListView',
+                                   model : 'samples',
+                                   contains : 'ToolsSamplerSampleListSampleView',
+                                   init : function (model) {
+    return model.each(function (sample) {
+        return this.add(new View(ToolsSamplerSampleListSampleView, sample));
+    }, this);
+},
+                                   render : function () {
+    var html = this.map(function (sampleListView) {
+        return sampleListView.$el;
+    });
+    return this.$el.html(html);
+}
+                                 };
+var ToolsSamplerSampleView = { type : 'ToolsSamplerSampleView',
+                               model : 'sample',
+                               render : function () {
+    var html = ('Name: ' + this.sample.name()) + '<br/>' + ('URI: ' + this.sample.uri());
+    return this.$el.html(html);
+}
+                             };
 var ToolsSamplerView = { type : 'ToolsSamplerView',
                          model : 'app',
                          className : 'ToolsAreaView',
                          init : function (model) {
-    this.create('instrumentList', new View(ToolsSamplerInstrumentListView, this.app));
-    return this.create('instrument', new View(ToolsSamplerInstrumentView, this.app));
+    this.create('sampleList', new View(ToolsSamplerSampleListView, samples));
+    this.create('sample');
+    return this.on('select-sample', function (e) {
+        this.sample(new View(ToolsSamplerSampleView, e.value));
+        return this.render();
+    });
 },
                          render : function () {
-    var html = [this.instrumentList().$el, this.instrument().$el];
+    var html = [this.sampleList().$el, this.sample() ? this.sample().$el : null];
+    return this.$el.html(html);
+}
+                       };
+var ToolsEffectsView = { type : 'ToolsEffectsView',
+                         model : 'app',
+                         className : 'ToolsAreaView',
+                         render : function () {
+    var html = ['Effects'];
     return this.$el.html(html);
 }
                        };
@@ -1168,6 +1138,7 @@ var ToolsView = { type : 'ToolsView',
     this.create('toolsView', new View(ToolsDummyView, this.app));
     this.create('notesView', new View(ToolsNotesView, this.app));
     this.create('samplerView', new View(ToolsSamplerView, this.app));
+    this.create('effectsView', new View(ToolsEffectsView, this.app));
     this.create('modularView', new View(ToolsModularView, this.app));
     this.toolsView().$el.css({ display : 'none' });
     this.on('open-tools-panel', function (e) {
@@ -1185,6 +1156,10 @@ var ToolsView = { type : 'ToolsView',
         this.toolsView(this.samplerView());
         return this.trigger('open-tools-panel');
     });
+    this.on('open-effects', function (e) {
+        this.toolsView(this.effectsView());
+        return this.trigger('open-tools-panel');
+    });
     this.on('open-modular', function (e) {
         this.toolsView(this.modularView());
         return this.trigger('open-tools-panel');
@@ -1199,53 +1174,30 @@ var ToolsView = { type : 'ToolsView',
     return this.$el.html(html);
 }
                 };
-/* (DEFVIEW *MINIBUFFER-VIEW MODEL app RENDER
-    (LAMBDA ()
-      ((@ THIS $EL HTML) <input class='MinibufferEditorView' type='text'>))) */
 var MinibufferView = { type : 'MinibufferView',
                        model : 'app',
                        render : function () {
     return this.$el.html('<input class=\'MinibufferEditorView\' type=\'text\'>');
 }
                      };
-/* (DEFVIEW *APP-VIEW MODEL app CONTAINS '*SONG-VIEW INIT
-    (LAMBDA (MODEL)
-      (THIS.CREATE 'MINIBUFFER (NEW (*VIEW *MINIBUFFER-VIEW THIS.APP)))
-      (THIS.CREATE 'TOOLS (NEW (*VIEW *TOOLS-VIEW THIS.APP)))
-      (THIS.CREATE 'SONG (NEW (*VIEW *SONG-VIEW ((@ THIS APP SONG))))))
-    RENDER
-    (LAMBDA ()
-      (LET ((HTML
-             (ARRAY (@ ((@ THIS SONG)) $EL) (@ ((@ THIS TOOLS)) $EL)
-              (@ ((@ THIS MINIBUFFER)) $EL))))
-        ((@ THIS $EL HTML) HTML)))) */
 var AppView = { type : 'AppView',
                 model : 'app',
                 contains : 'SongView',
                 init : function (model) {
     this.create('minibuffer', new View(MinibufferView, this.app));
     this.create('tools', new View(ToolsView, this.app));
-    return this.create('song', new View(SongView, this.app.song()));
+    this.create('song', new View(SongView, this.app.song()));
+    return this.on('load-sample', function (e) {
+        return this.song().loadSample(e.value);
+    });
 },
                 render : function () {
     var html = [this.song().$el, this.tools().$el, this.minibuffer().$el];
     return this.$el.html(html);
 }
               };
-/* (DEFVAR OPTIONS (NEW (*CLASS *OPTIONS))) */
 var options = new Class(Options);
-/* (DEFVAR APP (NEW (*CLASS *APP))) */
 var app = new Class(App);
-/* ((@ ($ DOCUMENT) READY)
-    (LAMBDA ()
-      (LET ((APP-VIEW (NEW (*VIEW *APP-VIEW APP))))
-        ((@ ($ 'BODY) HTML) (@ APP-VIEW $EL))
-        ((@ ($ DOCUMENT) BIND) 'CLICK
-         (LAMBDA (E)
-           (UNLESS
-               (OR (= (@ E TARGET TAG-NAME) INPUT)
-                   (= (@ E TARGET TAG-NAME) TEXTAREA))
-             ((@ ($ .MinibufferEditorView) SELECT)))))))) */
 $(document).ready(function () {
     var appView = new View(AppView, app);
     $('body').html(appView.$el);

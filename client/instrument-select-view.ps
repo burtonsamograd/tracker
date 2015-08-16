@@ -1,6 +1,27 @@
 ;; -*- mode: lisp -*-
 
+(defview *Instrument-select-name-view
+    model 'sample
+    init (lambda (model index)
+           (this.create 'index index))
+
+    render (lambda ()
+             (let ((html
+                    (+ (hex ((@ this index))) ": " ((@ (@ this sample) name)))
+                    ))
+               ((@ this $el html) html))))
+
 (defview *Instrument-select-view
     model 'song
+    init (lambda ()
+           ((@ ((@ this song samples)) on) :add this.render this))
     render (lambda ()
-             ((@ this $el html) "Instrument")))
+             (let* ((i -1)
+                    (html ((@ (this.song.samples) map)
+                           (lambda (sample)
+                             (incf i)
+                             (@ (new (*View *Instrument-select-name-view sample i)) $el)
+                             ))))
+               ((@ html unshift) (+ "Instruments: "
+                                     (hex (@ ((@ this song samples)) length))))
+             ((@ this $el html) html))))

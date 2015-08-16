@@ -1,0 +1,10 @@
+;; -*- mode: lisp -*-
+
+(defview *Tools-modular-view
+    model 'app
+    class-name "ToolsAreaView"
+    render (lambda ()
+             (let ((html (array
+                          "Modular"
+                          )))
+             ((@ this $el html) html))))

@@ -1,0 +1,74 @@
+;; -*- mode: lisp -*-
+
+
+(defview *Tools-sampler-sample-list-sample-name-view
+    model 'sample
+    init (lambda (model))
+    render (lambda ()
+             (let ((html
+                    ((@ (@ this sample) name))
+                     ))
+             ((@ this $el html) html))))
+             
+(defview *Tools-sampler-sample-list-sample-view
+    model 'sample
+    events (create
+            'click (lambda (e)
+                     (this.trigger :select-sample this.sample))
+            'dblclick (lambda (e)
+                        (this.trigger :load-sample this.sample)))
+            
+    init (lambda (model)
+           (this.create 'name (new (*View *Tools-sampler-sample-list-sample-name-view model))))
+    render (lambda ()
+             (let ((html
+                    (@ ((@ this name)) $el)
+                     ))
+             ((@ this $el html) html))))
+             
+
+(defview *Tools-sampler-sample-list-view
+    model 'samples
+    contains '*Tools-sampler-sample-list-sample-view
+    init (lambda (model)
+           (model.each (lambda (sample)
+                         (this.add (new (*View *Tools-sampler-sample-list-sample-view sample))))
+                       this))
+    render (lambda ()
+             (let ((html (this.map (lambda (sample-list-view)
+                                     (@ sample-list-view $el)))
+                     ))
+             ((@ this $el html) html))))
+
+(defview *Tools-sampler-sample-view
+    model 'sample
+    render (lambda ()
+             (let ((html
+                    (+ (+ "Name: "
+                          ((@ (@ this sample) name)))
+                       "<br/>"
+                     (+ "URI: "
+                        ((@ (@ this sample) uri))))
+                    ))
+             ((@ this $el html) html))))
+
+(defview *Tools-sampler-view
+    model 'app
+    class-name "ToolsAreaView"
+    init (lambda (model)
+           (this.create 'sample-list
+                        (new (*View *Tools-sampler-sample-list-view samples)))
+           (this.create 'sample)
+
+           (this.on :select-sample
+                    (lambda (e)
+                      ((@ this sample) (new (*View *Tools-sampler-sample-view e.value)))
+                      (this.render))))
+
+    render (lambda ()
+             (let ((html (array
+                          (@ ((@ this sample-list)) $el)
+                          (when ((@ this sample)) (@ ((@ this sample)) $el))
+                          )))
+             ((@ this $el html) html))))
+

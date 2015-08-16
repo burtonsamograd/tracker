@@ -1,0 +1,144 @@
+;; -*- mode: lisp -*-
+
+(defmacro deftool-button-view (name model text message)
+  `(defview ,name
+       model ,model
+       class-name "ToolsButtonView"
+       tag-name 'span
+       events (create
+               'click (lambda (e)
+                        (this.trigger ,message (@ this ,model))))
+       render (lambda ()
+                (let ((html (array
+                             ,text)))
+                  ((@ this $el html) html)))))
+
+(deftool-button-view *Tools-open-panel-view 'app "⤵" :open-tools-panel)
+(deftool-button-view *Tools-close-panel-view 'app "⤴" :close-tools-panel)
+(deftool-button-view *Tools-sampler-button-view 'app "Sampler" :open-sampler)
+(deftool-button-view *Tools-effects-button-view 'app "Effects" :open-effects)
+(deftool-button-view *Tools-modular-button-view 'app "Modular" :open-modular)
+(deftool-button-view *Tools-notes-button-view 'app "Notes" :open-notes)
+
+(defview *Tools-buttons-view
+    model 'app
+    init (lambda (model)
+           (this.create 'sampler-button (new (*View *Tools-sampler-button-view (@ this app))))
+           (this.create 'effects-button (new (*View *Tools-effects-button-view (@ this app))))
+           (this.create 'modular-button (new (*View *Tools-modular-button-view (@ this app))))
+           (this.create 'notes-button (new (*View *Tools-notes-button-view (@ this app))))
+           (this.add ((@ this sampler-button)))
+           (this.add ((@ this effects-button)))
+           (this.add ((@ this modular-button)))
+           (this.add ((@ this notes-button)))
+
+           (this.on :open-sampler 
+                    (lambda ()
+                      (this.select ((@ this sampler-button)))
+                      t))
+           (this.on :open-effects 
+                    (lambda ()
+                      (this.select ((@ this effects-button)))
+                      t))
+           (this.on :open-modular 
+                    (lambda ()
+                      (this.select ((@ this modular-button)))
+                      t))
+           (this.on :open-notes 
+                    (lambda ()
+                      (this.select ((@ this notes-button)))
+                      t))
+           )
+    deselect (lambda ()
+             (this.each (lambda (button-view)
+                          ((@ (@ button-view $el) remove-class) "ToolsButtonSelected"))))
+               
+    select (lambda (button)
+             (this.deselect)
+             ((@ (@ button $el) add-class) "ToolsButtonSelected"))
+
+    render (lambda ()
+             (let ((html (array
+                          (@ ((@ this sampler-button)) $el)
+                          (@ ((@ this effects-button)) $el)
+                          (@ ((@ this modular-button)) $el)
+                          (@ ((@ this notes-button)) $el)
+                          )))
+             ((@ this $el html) html))))
+             
+(defview *Tools-dummy-view
+    model 'app
+    tag-name 'span
+    render (lambda ()
+             (let ((html (array
+                          "No tool selected."
+                          )))
+             ((@ this $el html) html))))
+             
+(load "tools-sampler-view.ps")
+(load "tools-effects-view.ps")
+(load "tools-modular-view.ps")
+
+(defview *Tools-notes-view
+    model 'app
+    class-name "ToolsAreaView"
+    render (lambda ()
+             (let ((html (array
+                          ($ "<textarea style='width:100%;height:100%'>")
+                          )))
+             ((@ this $el html) html))))
+             
+(defview *Tools-view
+    model 'app
+    init (lambda (model)
+           (this.create 'open-close-panel-button (new (*View *Tools-open-panel-view (@ this app))))
+           (this.create 'tools-buttons (new (*View *Tools-buttons-view (@ this app))))
+           (this.create 'tools-view (new (*View *Tools-dummy-view (@ this app))))
+           (this.create 'notes-view (new (*View *Tools-notes-view (@ this app))))
+           (this.create 'sampler-view (new (*View *Tools-sampler-view (@ this app))))
+           (this.create 'effects-view (new (*View *Tools-effects-view (@ this app))))
+           (this.create 'modular-view (new (*View *Tools-modular-view (@ this app))))
+           ((@ (@ ((@ this tools-view)) $el) css) (create display 'none))
+
+
+           (this.on :open-tools-panel
+                    (lambda (e)
+                      ((@ (@ ((@ this tools-view)) $el) css) (create display 'inherit))
+                      ((@ this open-close-panel-button)
+                       (new (*View *Tools-close-panel-view (@ this app))))
+                      (this.render)))
+           
+           (this.on :close-tools-panel
+                    (lambda (e)
+                      ((@ (@ ((@ this tools-view)) $el) css) (create display 'none))
+                      ((@ this open-close-panel-button)
+                       (new (*View *Tools-open-panel-view (@ this app))))
+                      ((@ ((@ this tools-buttons)) deselect))
+                      (this.render)))
+
+           (this.on :open-sampler
+                    (lambda (e)
+                      ((@ this tools-view) ((@ this sampler-view)))
+                      (this.trigger :open-tools-panel)))
+           (this.on :open-effects
+                    (lambda (e)
+                      ((@ this tools-view) ((@ this effects-view)))
+                      (this.trigger :open-tools-panel)))
+           (this.on :open-modular
+                    (lambda (e)
+                      ((@ this tools-view) ((@ this modular-view)))
+                      (this.trigger :open-tools-panel)))
+           (this.on :open-notes
+                    (lambda (e)
+                      ((@ this tools-view) ((@ this notes-view)))
+                      (this.trigger :open-tools-panel)))
+           )
+    render (lambda ()
+             (let ((html (array
+                          (@ ((@ this open-close-panel-button)) $el)
+                          (@ ((@ this tools-buttons)) $el)
+                          (@ ((@ this tools-view)) $el)
+                          )))
+             ((@ this $el html) html))))
+
+

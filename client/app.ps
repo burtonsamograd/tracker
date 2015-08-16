@@ -17,6 +17,30 @@
               user-name "Dave"
               confirm true))
 
+(defmodel *Sample
+    init (lambda (name uri)
+           (this.create 'name name)
+           (this.create 'uri uri)
+           (this.create 'start 0)
+           (this.create 'end 0)
+           (this.create 'loop false)
+           (this.create 'ping-pong false)
+           (this.create 'envelope)
+           ))
+
+(defcontainer *Samples *Sample
+  init (lambda ()
+         (this.on :add (lambda (e)
+                         (setf (getprop this ((@ e value name))) e.value)))
+         (this.on :remove (lambda (e)
+                            (delete (getprop this ((@ e value name))))))))
+
+(defvar samples (new (*Class *Samples)))
+(samples.add (new (*Class *Sample "Sin" "/samples/sin.wav")))
+(samples.add (new (*Class *Sample "Saw" "/samples/saw.wav")))
+(samples.add (new (*Class *Sample "Square" "/samples/sqr.wav")))
+(samples.add (new (*Class *Sample "Triangle" "/samples/tri.wav")))
+
 (defmodel *Note
     init (lambda (instrument pitch fx arg)
            (this.create :instrument instrument)
@@ -146,44 +170,54 @@
          (this.create 'gain gain)
          (this.create 'pan pan)
          (this.create 'size num-patterns)
+         (this.create 'samples (new (*Class *Samples)))
          (setf (@ this pattern-counter) ((@ this size)))
          (dotimes (i ((@ this size)))
            (this.add (new (*Class *Pattern (+ ((@ options default-pattern-name)) " " i))) t))
 
-         (this.on :close-pattern
-                  (lambda (e)
-                    (if (> this.length 1)
-                        (this.remove e.value)
-                        (alert (+ "I'm sorry "
-                                  ((@ options user-name))
-                                  ", but you can't delete the last pattern.")))))
-         (this.on :add-pattern
-                  (lambda (e)
-                    (let ((i ((@ this index-of) e.value)))
-                      ((@ this insert-at) (1+ i)
-                       (new (*Class *Pattern (+ ((@ options default-pattern-name)) " "
-                                                (incf (@ this pattern-counter)))))))))
-         (this.on :copy-pattern
-                  (lambda (e)
-                    (let ((i ((@ this index-of) e.value))
-                          (new-pattern (e.value.copy)))
-                      ((@ this insert-at) (1+ i) new-pattern)
-                      ((@ new-pattern name) (+ ((@ e.value name)) " ⎘")))))
-         (this.on :link-pattern
-                  (lambda (e)
-                    (let ((i ((@ this index-of) e.value)))
-                      ((@ this insert-at) (1+ i) e.value))))
-         (this.on :move-pattern-up
-                  (lambda (e)
+         (this.on :close-pattern (@ this close-pattern))
+         (this.on :add-pattern (@ this add-pattern))
+         (this.on :copy-pattern (@ this copy-pattern))
+         (this.on :link-pattern (@ this link-pattern))
+         (this.on :move-pattern-up (@ this move-pattern-up))
+         (this.on :move-pattern-down (@ this move-pattern-down))
+         )
+
+  close-pattern (lambda (e)
+                  (if (> this.length 1)
+                      (this.remove e.value)
+                      (alert (+ "I'm sorry "
+                                ((@ options user-name))
+                                ", but you can't delete the last pattern."))))
+
+  add-pattern (lambda (e)
+                (let ((i ((@ this index-of) e.value)))
+                  ((@ this insert-at) (1+ i)
+                   (new (*Class *Pattern (+ ((@ options default-pattern-name)) " "
+                                            (incf (@ this pattern-counter))))))))
+  copy-pattern (lambda (e)
+                 (let ((i ((@ this index-of) e.value))
+                       (new-pattern (e.value.copy)))
+                   ((@ this insert-at) (1+ i) new-pattern)
+                   ((@ new-pattern name) (+ ((@ e.value name)) " ⎘"))))
+
+  link-pattern (lambda (e)
+                 (let ((i ((@ this index-of) e.value)))
+                   ((@ this insert-at) (1+ i) e.value)))
+
+  move-pattern-up (lambda (e)
                     (let ((i ((@ this index-of) e.value)))
                       (if (> i 0)
-                          (this.swap i (1- i))))))
-         (this.on :move-pattern-down
-                  (lambda (e)
-                    (let ((i ((@ this index-of) e.value)))
-                      (if (< i (- this.length 1))
-                          (this.swap i (1+ i))))))
-         ))
+                          (this.swap i (1- i)))))
+
+  move-pattern-down (lambda (e)
+                      (let ((i ((@ this index-of) e.value)))
+                        (if (< i (- this.length 1))
+                            (this.swap i (1+ i)))))
+
+  load-sample (lambda (sample)
+                ((@ ((@ this samples)) add) sample))
+  )
 
 (defcontainer *App *Song
   init (lambda ()
@@ -211,7 +245,12 @@
     init (lambda (model)
            (this.create 'minibuffer (new (*View *Minibuffer-view this.app)))
            (this.create 'tools (new (*View *Tools-view this.app)))
-           (this.create 'song (new (*View *Song-view ((@ this app song))))))
+           (this.create 'song (new (*View *Song-view ((@ this app song)))))
+
+
+           (this.on :load-sample (lambda (e)
+                                   ((@ ((@ this song)) load-sample) e.value)))
+           )
     render (lambda ()
              (let ((html (array
                           (@ ((@ this song)) $el)
