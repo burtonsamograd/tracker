@@ -33,7 +33,6 @@
            (this.pattern.on :remove (lambda (e)
                                       (setf this.removed e.value)) this)
            (this.pattern.on :modified (@ this rebuild-views) this))
-
     add-view (lambda ()
                (let ((i ((@ this pattern index-of) this.added))
                      (view (new (*View *Channel-view this.added))))

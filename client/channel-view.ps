@@ -5,7 +5,8 @@
 (deftiny-button-view *Channel-add-button-view "+" 'channel :add-channel)
 (deftiny-button-view *Channel-copy-button-view "⎘" 'channel :copy-channel)
 (deftiny-button-view *Channel-close-button-view "✗" 'channel :close-channel
-                     :confirm-message "Are you sure you want to delete this channel?"
+                     :confirm-message (+ ((@ options user-name))
+                                         ", are you sure you want to delete this channel?")
                      :class-name "ChannelCloseButton")
 
 (defview *Channel-monitor-view

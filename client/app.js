@@ -18,7 +18,7 @@ function hex(x, len) {
     (CREATE DEFAULT-SONG-NAME untitled DEFAULT-PATTERN-NAME Pattern
      DEFAULT-CHANNEL-NAME Channel DEFAULT-NUM-CHANNELS 4 DEFAULT-PATTERN-SIZE
      16 DEFAULT-NUM-PATTERNS 4 DEFAULT-TEMPO 0X80 DEFAULT-TICS-PER-BEAT 6
-     DEFAULT-GAIN 0X80 DEFAULT-PAN 0X80)) */
+     DEFAULT-GAIN 0X80 DEFAULT-PAN 0X80 USER-NAME Dave CONFIRM TRUE)) */
 var Options = { type : 'Options', defaults : { defaultSongName : 'untitled',
                                                defaultPatternName : 'Pattern',
                                                defaultChannelName : 'Channel',
@@ -28,7 +28,9 @@ var Options = { type : 'Options', defaults : { defaultSongName : 'untitled',
                                                defaultTempo : 0x80,
                                                defaultTicsPerBeat : 6,
                                                defaultGain : 0x80,
-                                               defaultPan : 0x80
+                                               defaultPan : 0x80,
+                                               userName : 'Dave',
+                                               confirm : true
                                              } };
 /* (DEFMODEL *NOTE INIT
     (LAMBDA (INSTRUMENT PITCH FX ARG)
@@ -146,7 +148,9 @@ var Channel = { type : 'Channel',
                (DO ((J I (INCF J)))
                    ((= J THIS.LENGTH))
                  ((@ ((@ THIS AT) J) INDEX) J)))
-             (ALERT I'm sorry Dave, but you can't delete the last channel.))))
+             (ALERT
+              (+ I'm sorry  ((@ OPTIONS USER-NAME))
+                 , but you can't delete the last channel.)))))
       (THIS.ON ADD-CHANNEL
        (LAMBDA (E)
          (LET ((I ((@ THIS INDEX-OF) E.VALUE)))
@@ -209,7 +213,7 @@ var Pattern = { type : 'Pattern',
                 j = _js2;
             };
         } else {
-            return alert('I\'m sorry Dave, but you can\'t delete the last channel.');
+            return alert('I\'m sorry ' + options.userName() + ', but you can\'t delete the last channel.');
         };
     });
     this.on('add-channel', function (e) {
@@ -265,21 +269,25 @@ var Pattern = { type : 'Pattern',
       (THIS.CREATE 'GAIN GAIN)
       (THIS.CREATE 'PAN PAN)
       (THIS.CREATE 'SIZE NUM-PATTERNS)
+      (SETF (@ THIS PATTERN-COUNTER) ((@ THIS SIZE)))
       (DOTIMES (I ((@ THIS SIZE)))
         (THIS.ADD
-         (NEW (*CLASS *PATTERN (+ ((@ OPTIONS DEFAULT-PATTERN-NAME))   I)))))
+         (NEW (*CLASS *PATTERN (+ ((@ OPTIONS DEFAULT-PATTERN-NAME))   I))) T))
       (THIS.ON CLOSE-PATTERN
        (LAMBDA (E)
          (IF (> THIS.LENGTH 1)
              (THIS.REMOVE E.VALUE)
-             (ALERT I'm sorry Dave, but you can't delete the last pattern.))))
+             (ALERT
+              (+ I'm sorry  ((@ OPTIONS USER-NAME))
+                 , but you can't delete the last pattern.)))))
       (THIS.ON ADD-PATTERN
        (LAMBDA (E)
          (LET ((I ((@ THIS INDEX-OF) E.VALUE)))
            ((@ THIS INSERT-AT) (1+ I)
             (NEW
              (*CLASS *PATTERN
-              (+ ((@ OPTIONS DEFAULT-PATTERN-NAME))   (1+ THIS.LENGTH))))))))
+              (+ ((@ OPTIONS DEFAULT-PATTERN-NAME))
+                 (INCF (@ THIS PATTERN-COUNTER)))))))))
       (THIS.ON COPY-PATTERN
        (LAMBDA (E)
          (LET ((I ((@ THIS INDEX-OF) E.VALUE)) (NEW-PATTERN (E.VALUE.COPY)))
@@ -326,15 +334,16 @@ var Song = { type : 'Song',
     this.create('gain', gain);
     this.create('pan', pan);
     this.create('size', numPatterns);
+    this.patternCounter = this.size();
     for (var i = 0; i < this.size(); i += 1) {
-        this.add(new Class(Pattern, options.defaultPatternName() + ' ' + i));
+        this.add(new Class(Pattern, options.defaultPatternName() + ' ' + i), true);
     };
     this.on('close-pattern', function (e) {
-        return this.length > 1 ? this.remove(e.value) : alert('I\'m sorry Dave, but you can\'t delete the last pattern.');
+        return this.length > 1 ? this.remove(e.value) : alert('I\'m sorry ' + options.userName() + ', but you can\'t delete the last pattern.');
     });
     this.on('add-pattern', function (e) {
         var i = this.indexOf(e.value);
-        return this.insertAt(i + 1, new Class(Pattern, options.defaultPatternName() + ' ' + (this.length + 1)));
+        return this.insertAt(i + 1, new Class(Pattern, options.defaultPatternName() + ' ' + ++this.patternCounter));
     });
     this.on('copy-pattern', function (e) {
         var i = this.indexOf(e.value);
@@ -519,7 +528,11 @@ var ChannelCloseButtonView = { type : 'ChannelCloseButtonView',
                                model : 'channel',
                                className : 'TinyButton ChannelCloseButton',
                                events : { 'click' : function (e) {
-    return confirm('Are you sure you want to delete this channel?') ? this.channel.trigger('close-channel', this.channel) : null;
+    if (options.confirm()) {
+        return confirm(options.userName() + ', are you sure you want to delete this channel?') ? this.channel.trigger('close-channel', this.channel) : null;
+    } else {
+        return this.channel.trigger('close-channel', this.channel);
+    };
 } },
                                render : function () {
     return this.$el.html('\u2717');
@@ -811,7 +824,11 @@ var PatternCloseButtonView = { type : 'PatternCloseButtonView',
                                model : 'pattern',
                                className : 'TinyButton ',
                                events : { 'click' : function (e) {
-    return confirm('Are you sure you want to delete this pattern?') ? this.pattern.trigger('close-pattern', this.pattern) : null;
+    if (options.confirm()) {
+        return confirm(options.userName() + ', are you sure you want to delete this pattern?') ? this.pattern.trigger('close-pattern', this.pattern) : null;
+    } else {
+        return this.pattern.trigger('close-pattern', this.pattern);
+    };
 } },
                                render : function () {
     return this.$el.html('\u2717');

@@ -6,7 +6,8 @@
 (deftiny-button-view *Pattern-copy-button-view "⎘" 'pattern :copy-pattern)
 (deftiny-button-view *Pattern-link-button-view "⌘" 'pattern :link-pattern)
 (deftiny-button-view *Pattern-close-button-view "✗" 'pattern :close-pattern
-                     :confirm-message "Are you sure you want to delete this pattern?")
+                     :confirm-message (+ ((@ options user-name))
+                                         ", are you sure you want to delete this pattern?"))
  
 (defview *Song-pattern-edit-select-buttons-view
     model "pattern"

@@ -23,8 +23,10 @@
                                &key confirm-message (class-name ""))
   (let ((click-fn (if confirm-message
                       `(lambda (e)
-                         (when (confirm ,confirm-message)
-                           ((@ this ,model trigger) ,message (@ this ,model))))
+                         (if ((@ options confirm))
+                             (when (confirm ,confirm-message)
+                               ((@ this ,model trigger) ,message (@ this ,model)))
+                             ((@ this ,model trigger) ,message (@ this ,model))))
                       `(lambda (e)
                          ((@ this ,model trigger) ,message (@ this ,model)))))
         (class-name (concatenate 'string "TinyButton " class-name)))
