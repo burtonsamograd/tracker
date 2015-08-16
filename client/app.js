@@ -173,11 +173,27 @@ var Pattern = { type : 'Pattern',
             return e.value.index(i + 1);
         };
     });
-    return this.on('change:size', function (e) {
+    this.on('change:size', function (e) {
         return this.each(function (channel) {
             return channel.size(this.size());
         });
     });
+    this.on('play', this.play, this);
+    return this.on('loop', this.loop, this);
+},
+                play : function () {
+    sm.reset(null);
+    this.each(function (channel) {
+        var i = 0;
+        return channel.each(function (note) {
+            sm.note(i, note);
+            return ++i;
+        });
+    });
+    return sm.play();
+},
+                loop : function () {
+    return alert('loopingPattern' + this.name());
 }
               };
 var Song = { type : 'Song',
@@ -207,7 +223,7 @@ var Song = { type : 'Song',
     this.create('gain', gain);
     this.create('pan', pan);
     this.create('size', numPatterns);
-    this.create('samples', new Class(Samples));
+    this.create('instruments', new Class(Samples));
     this.patternCounter = this.size();
     for (var i = 0; i < this.size(); i += 1) {
         this.add(new Class(Pattern, options.defaultPatternName() + ' ' + i), true);
@@ -244,8 +260,8 @@ var Song = { type : 'Song',
     var i = this.indexOf(e.value);
     return i < this.length - 1 ? this.swap(i, i + 1) : null;
 },
-             loadSample : function (sample) {
-    return this.samples().add(sample);
+             loadSample : function (sampleInstrument) {
+    return this.instruments().add(sampleInstrument);
 }
            };
 var App = { type : 'App',
@@ -602,6 +618,26 @@ var PatternEditView = { type : 'PatternEditView',
     }));
 }
                       };
+var PatternPlayButtonView = { type : 'PatternPlayButtonView',
+                              model : 'pattern',
+                              className : 'TinyButton ',
+                              events : { 'click' : function (e) {
+    return this.pattern.trigger('play', this.pattern);
+} },
+                              render : function () {
+    return this.$el.html('\u2193');
+}
+                            };
+var PatternLoopButtonView = { type : 'PatternLoopButtonView',
+                              model : 'pattern',
+                              className : 'TinyButton ',
+                              events : { 'click' : function (e) {
+    return this.pattern.trigger('loop', this.pattern);
+} },
+                              render : function () {
+    return this.$el.html('\u2195');
+}
+                            };
 var PatternNameView = { type : 'PatternNameView',
                         model : 'pattern',
                         init : function (model) {
@@ -625,11 +661,13 @@ var PatternSizeView = { type : 'PatternSizeView',
 var PatternModeLineView = { type : 'PatternModeLineView',
                             model : 'pattern',
                             init : function (model) {
-    this.create('name', new View(PatternNameView, this.pattern));
-    return this.create('size', new View(PatternSizeView, this.pattern));
+    this.create('play', new View(PatternPlayButtonView, model));
+    this.create('loop', new View(PatternLoopButtonView, model));
+    this.create('name', new View(PatternNameView, model));
+    return this.create('size', new View(PatternSizeView, model));
 },
                             render : function () {
-    var html = [this.name().$el, this.size().$el];
+    var html = [this.play().$el, this.loop().$el, this.name().$el, this.size().$el];
     return this.$el.html(html);
 }
                           };
@@ -807,6 +845,9 @@ var InstrumentSelectNameView = { type : 'InstrumentSelectNameView',
                                  init : function (model, index) {
     return this.create('index', index);
 },
+                                 events : { 'click' : function (e) {
+    return this.trigger('instrumentSelect', this.sample);
+} },
                                  render : function () {
     var html = hex(this.index()) + ': ' + this.sample.name();
     return this.$el.html(html);
@@ -815,15 +856,42 @@ var InstrumentSelectNameView = { type : 'InstrumentSelectNameView',
 var InstrumentSelectView = { type : 'InstrumentSelectView',
                              model : 'song',
                              init : function () {
-    return this.song.samples().on('add', this.render, this);
+    this.samples = this.song.instruments();
+    this.samples.on('add', this.rebuildViews, this);
+    this.samples.on('remove', this.rebuildViews, this);
+    this.samples.on('modify', this.rebuildViews, this);
+    this.rebuildViews();
+    return this.on('instrumentSelect', function (e) {
+        this.deselect();
+        this.select(e.value);
+        return true;
+    });
+},
+                             deselect : function () {
+    return this.map(function (nameView) {
+        return nameView.$el.removeClass('InstrumentSelected');
+    });
+},
+                             select : function (sample) {
+    var view = this.find(function (nameView) {
+        return nameView.sample === sample;
+    });
+    return view.$el.addClass('InstrumentSelected');
+},
+                             rebuildViews : function () {
+    this.clear();
+    var i = -1;
+    this.samples.map(function (sample) {
+        ++i;
+        return this.add(new View(InstrumentSelectNameView, sample, i), true);
+    }, this);
+    return this.render();
 },
                              render : function () {
-    var i = -1;
-    var html = this.song.samples().map(function (sample) {
-        ++i;
-        return (new View(InstrumentSelectNameView, sample, i)).$el;
+    var html = this.map(function (nameView) {
+        return nameView.$el;
     });
-    html.unshift('Instruments: ' + hex(this.song.samples().length));
+    html.unshift('Instruments: ' + hex(this.song.instruments().length));
     return this.$el.html(html);
 }
                            };
@@ -900,6 +968,7 @@ var SongView = { type : 'SongView',
                  model : 'song',
                  init : function (model) {
     this.create('currentPattern');
+    this.create('currentInstrument');
     this.create('patternEditor');
     this.create('patternEditSelect', new View(SongPatternEditSelectView, this.song));
     this.create('instrumentSelect', new View(InstrumentSelectView, this.song));
@@ -909,8 +978,11 @@ var SongView = { type : 'SongView',
         return this.render();
     });
     this.set('currentPattern', this.song.at(0));
-    return this.on('selectPattern', function (e) {
+    this.on('selectPattern', function (e) {
         return this.currentPattern(e.value);
+    });
+    return this.on('instrumentSelect', function (e) {
+        return this.currentInstrument(e.value);
     });
 },
                  loadSample : function (sample) {
@@ -1126,8 +1198,8 @@ var ToolsNotesView = { type : 'ToolsNotesView',
                        model : 'app',
                        className : 'ToolsAreaView',
                        render : function () {
-    var html = [$('<textarea style=\'width:100%;height:100%\'>')];
-    return this.$el.html(html);
+    var el = $('<textarea style=\'width:100%;height:100%\'>');
+    return this.$el.html(el);
 }
                      };
 var ToolsView = { type : 'ToolsView',
@@ -1198,10 +1270,34 @@ var AppView = { type : 'AppView',
               };
 var options = new Class(Options);
 var app = new Class(App);
+var SoundManager = { type : 'SoundManager',
+                     init : function () {
+    this.song = app.song();
+    this.tempo = this.song.tempo();
+    this.mspb = (60 / this.tempo) * 1000;
+    this.instruments = this.song.instruments();
+    return this.reset();
+},
+                     reset : function () {
+    this.currentTime = 0;
+    return this.notes = [];
+},
+                     note : function (beat, note) {
+    var instrument3;
+    return this.notes.push((instrument3 = note.instrument(), instrument3 && instrument3 < this.instruments.length ? [beat * this.mspb, this.instruments.at(note.instrument())] : null));
+},
+                     play : function () {
+    return null;
+}
+                   };
+var sm = new Class(SoundManager);
 $(document).ready(function () {
     var appView = new View(AppView, app);
-    $('body').html(appView.$el);
-    return $(document).bind('click', function (e) {
+    $(document).bind('dblclick', function (e) {
+        return e.preventDefault();
+    });
+    $(document).bind('click', function (e) {
         return !(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') ? $('.MinibufferEditorView').select() : null;
     });
+    return $('body').html(appView.$el);
 });

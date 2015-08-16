@@ -33,6 +33,7 @@
            (this.pattern.on :remove (lambda (e)
                                       (setf this.removed e.value)) this)
            (this.pattern.on :modified (@ this rebuild-views) this))
+
     add-view (lambda ()
                (let ((i ((@ this pattern index-of) this.added))
                      (view (new (*View *Channel-view this.added))))
@@ -68,6 +69,9 @@
                              (lambda (channel-view)
                                (@ channel-view $el))))))
 
+(deftiny-button-view *Pattern-play-button-view "↓" 'pattern 'play)
+(deftiny-button-view *Pattern-loop-button-view "↕" 'pattern 'loop)
+
 (defview *Pattern-name-view
     model "pattern"
     init (lambda (model)
@@ -95,11 +99,15 @@
 (defview *Pattern-mode-line-view
     model "pattern"
     init (lambda (model)
-           (this.create 'name (new (*View *Pattern-name-view this.pattern)))
-           (this.create 'size (new (*View *Pattern-size-view this.pattern))))
+           (this.create 'play (new (*View *Pattern-play-button-view model)))
+           (this.create 'loop (new (*View *Pattern-loop-button-view model)))
+           (this.create 'name (new (*View *Pattern-name-view model)))
+           (this.create 'size (new (*View *Pattern-size-view model))))
 
     render (lambda ()
              (let ((html (array
+                          (@ ((@ this play)) $el)
+                          (@ ((@ this loop)) $el)
                           (@ ((@ this name)) $el)
                           (@ ((@ this size)) $el))))
              ((@ this $el html) html))))

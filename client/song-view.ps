@@ -35,6 +35,7 @@
     model "song"
     init (lambda (model)
            (this.create 'current-pattern)
+           (this.create 'current-instrument)
            (this.create 'pattern-editor)
            (this.create 'pattern-edit-select
                         (new (*View *Song-pattern-edit-select-view this.song)))
@@ -51,7 +52,12 @@
            (this.set 'current-pattern ((@ this song at) 0))
 
            (this.on 'select-pattern (lambda (e)
-                                      ((@ this current-pattern) e.value))))
+                                      ((@ this current-pattern) e.value)))
+
+           (this.on 'instrument-select
+                    (lambda (e)
+                      ((@ this current-instrument) e.value)))
+           )
 
     load-sample (lambda (sample)
                   ((@ this song load-sample) sample))

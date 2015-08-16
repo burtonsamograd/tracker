@@ -4,6 +4,9 @@
     model 'sample
     init (lambda (model index)
            (this.create 'index index))
+    events (create
+            'click (lambda (e)
+                     (this.trigger 'instrument-select this.sample)))
 
     render (lambda ()
              (let ((html
@@ -14,14 +17,40 @@
 (defview *Instrument-select-view
     model 'song
     init (lambda ()
-           ((@ ((@ this song samples)) on) :add this.render this))
+           (setf (@ this samples) ((@ this song instruments)))
+           ((@ this samples on) :add (@ this rebuild-views) this)
+           ((@ this samples on) :remove (@ this rebuild-views) this)
+           ((@ this samples on) :modify (@ this rebuild-views) this)
+           ((@ this rebuild-views))
+
+           (this.on 'instrument-select (lambda (e)
+                                         (this.deselect)
+                                         (this.select e.value)
+                                         t))
+           )
+
+    deselect (lambda ()
+               (this.map (lambda (name-view)
+                           ((@ name-view $el remove-class) "InstrumentSelected"))))
+    select (lambda (sample)
+             (let ((view (this.find (lambda (name-view)
+                                      (= (@ name-view sample) sample)))))
+               ((@ view $el add-class) "InstrumentSelected")))
+
+    rebuild-views (lambda ()
+                    (this.clear)
+                    (let ((i -1))
+                      ((@ this samples map)
+                       (lambda (sample)
+                         (incf i)
+                         (this.add (@ (new (*View *Instrument-select-name-view sample i))) t))
+                       this))
+                    (this.render))
+
     render (lambda ()
-             (let* ((i -1)
-                    (html ((@ (this.song.samples) map)
-                           (lambda (sample)
-                             (incf i)
-                             (@ (new (*View *Instrument-select-name-view sample i)) $el)
-                             ))))
+             (let* ((html (this.map (lambda (name-view)
+                                      (@ name-view $el)))
+                             ))
                ((@ html unshift) (+ "Instruments: "
-                                     (hex (@ ((@ this song samples)) length))))
+                                     (hex (@ ((@ this song instruments)) length))))
              ((@ this $el html) html))))

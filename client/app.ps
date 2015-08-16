@@ -154,7 +154,25 @@
          (this.on "change:size" (lambda (e)
                                   (this.each (lambda (channel)
                                                ((@ channel size) ((@ this size)))))))
-         ))
+
+         (this.on 'play this.play this)
+         (this.on 'loop this.loop this)
+         )
+
+  play (lambda ()
+         (sm.reset())
+         (this.each
+          (lambda (channel)
+            (let ((i 0))
+              (channel.each
+               (lambda (note)
+                 (sm.note i note)
+                 (incf i))))))
+         (sm.play))
+
+  loop (lambda ()
+         (alert (+ 'looping-pattern ((@ this name)))))
+  )
 
 (defcontainer *Song *Pattern
   init (lambda (&optional
@@ -170,7 +188,7 @@
          (this.create 'gain gain)
          (this.create 'pan pan)
          (this.create 'size num-patterns)
-         (this.create 'samples (new (*Class *Samples)))
+         (this.create 'instruments (new (*Class *Samples)))
          (setf (@ this pattern-counter) ((@ this size)))
          (dotimes (i ((@ this size)))
            (this.add (new (*Class *Pattern (+ ((@ options default-pattern-name)) " " i))) t))
@@ -215,8 +233,8 @@
                         (if (< i (- this.length 1))
                             (this.swap i (1+ i)))))
 
-  load-sample (lambda (sample)
-                ((@ ((@ this samples)) add) sample))
+  load-sample (lambda (sample-instrument)
+                ((@ ((@ this instruments)) add) sample-instrument))
   )
 
 (defcontainer *App *Song
@@ -246,8 +264,6 @@
            (this.create 'minibuffer (new (*View *Minibuffer-view this.app)))
            (this.create 'tools (new (*View *Tools-view this.app)))
            (this.create 'song (new (*View *Song-view ((@ this app song)))))
-
-
            (this.on :load-sample (lambda (e)
                                    ((@ ((@ this song)) load-sample) e.value)))
            )
@@ -261,14 +277,20 @@
 (defvar options (new (*Class *Options)))
 (defvar app (new (*Class *App)))
 
+(load "sound-manager.ps")
+(defvar sm (new (*Class *Sound-manager)))
+
 ((@ ($ document) ready)
  (lambda ()
    (let ((app-view (new (*View *App-view app))))
-     ((@ ($ 'body) html) (@ app-view $el))
+     ((@ ($ document) bind) 'dblclick (lambda (e)
+                                     ((@ e prevent-default))))
      ((@ ($ document) bind) 'click (lambda (e)
                                      (unless (or (= (@ e target tag-name) "INPUT")
                                                  (= (@ e target tag-name) "TEXTAREA"))
-                                       ((@ ($ ".MinibufferEditorView") select))))))))
+                                       ((@ ($ ".MinibufferEditorView") select)))))
+     ((@ ($ 'body) html) (@ app-view $el))
+     )))
 ;     ((@ ($ document) bind) 'keydown (lambda (e)
 ;                                       (console.log (@ e char-code))))
    

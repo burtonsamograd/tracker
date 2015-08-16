@@ -1,0 +1,22 @@
+;; -*- mode: lisp -*-
+
+(defmodel *Sound-manager
+    init (lambda ()
+           (setf this.song ((@ app song))
+                 this.tempo ((@ this song tempo))
+                 this.mspb (* (/ 60 this.tempo) 1000) ;; miliseconds per beat
+                 this.instruments (this.song.instruments))
+           (this.reset)
+           )
+    reset (lambda ()
+            (setf (@ this current-time) 0)
+            (setf (@ this notes) (array)))
+
+    note (lambda (beat note)
+           ((@ this notes push)
+            (let ((instrument ((@ note instrument))))
+            (when (and instrument (< instrument this.instruments.length))
+              (array (* beat this.mspb) ((@ this instruments at) ((@ note instrument))))))))
+    play (lambda ()
+           ))
+
