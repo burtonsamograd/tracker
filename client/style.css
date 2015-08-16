@@ -30,7 +30,7 @@ input[type=text] {
 }
 
 .PatternNameView {
-    padding-left: 1em;
+    padding-left: .5em;
     display: inline-block;
 }
 
@@ -41,7 +41,7 @@ input[type=text] {
 .PatternSizeView {
     display: inline-block;
     float: right;
-    padding-right: 1em;
+    padding-right: .5em;
 }
 
 .PatternSizeEditView {
@@ -59,11 +59,11 @@ input[type=text] {
 }
 
 .ChannelGainView {
-    display: inline;
+    display: inline-block;
 }
 
 .ChannelPanView {
-    display: inline;
+    display: inline-block;
 }
 
 .ChannelMonitorView {
@@ -101,6 +101,7 @@ input[type=text] {
     padding: .25em;
     border: 2px solid;
     border-top: 4px solid;
+    overflow: auto;
 }
 
 .SongPatternEditNameSelectorView {
@@ -172,7 +173,8 @@ input[type=text] {
 }
 
 .ChannelCloseButton {
-    padding-left:  .5em;
+    float: right;
+    padding-right:  .3em;
 }
 
 .ChannelTitleView {
@@ -213,6 +215,7 @@ input[type=text] {
 
 .MinibufferEditorView {
     background-color: transparent;
+    width: 100%;
 }
 
 .MinibufferView {
@@ -222,6 +225,27 @@ input[type=text] {
 .SongControlsView {
     padding: .25em;
     display: inline-block;
+}
+
+.ToolsView {
+    padding: .25em;
+    border: 2px solid;
+}
+
+.ToolsButtonView {
+    padding-left: .5em;
+    padding-right: .5em;
+    border-right: 1px solid;
+}
+
+.ToolsButtonsView {
+    display: inline-block;
+}
+
+.ToolsAreaView {
+    padding: .5em;
+    border: 1px solid;
+    height: 25em;
 }
 
 .SongControlsEditView {
@@ -245,4 +269,5 @@ input[type=text] {
     border: 4px solid;
     border-radius: 8px 8px;
 }
+
 

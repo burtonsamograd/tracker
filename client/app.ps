@@ -63,12 +63,13 @@
 
          (this.on :close-channel
                   (lambda (e)
-                    (let ((i ((@ this index-of) e.value)))
-                      (this.remove e.value)
-                      (do ((j i (incf j)))
-                          ((= j this.length))
-                        ((@ ((@ this at) j) index) j))
-                      )))
+                    (if (> this.length 1)
+                      (let ((i ((@ this index-of) e.value)))
+                        (this.remove e.value)
+                        (do ((j i (incf j)))
+                            ((= j this.length))
+                          ((@ ((@ this at) j) index) j)))
+                      (alert "I'm sorry Dave, but you can't delete the last channel."))))
 
          (this.on :add-channel
                   (lambda (e)
@@ -123,7 +124,9 @@
 
          (this.on :close-pattern
                   (lambda (e)
-                    (this.remove e.value)))
+                    (if (> this.length 1)
+                        (this.remove e.value)
+                        (alert "I'm sorry Dave, but you can't delete the last pattern."))))
          (this.on :add-pattern
                   (lambda (e)
                     (let ((i ((@ this index-of) e.value)))
@@ -160,22 +163,24 @@
 (load "channel-view.ps")
 (load "pattern-view.ps")
 (load "song-view.ps")
+(load "tools-view.ps")
 
 (defview *Minibuffer-view
     model "app"
     render (lambda ()
              ((@ this $el html) "<input class='MinibufferEditorView' type='text'>")))
 
-
 (defview *App-view
     model "app"
     contains '*Song-view
     init (lambda (model)
            (this.create 'minibuffer (new (*View *Minibuffer-view this.app)))
+           (this.create 'tools (new (*View *Tools-view this.app)))
            (this.create 'song (new (*View *Song-view ((@ this app at) 0)))))
     render (lambda ()
              (let ((html (array
                           (@ ((@ this song)) $el)
+                          (@ ((@ this tools)) $el)
                           (@ ((@ this minibuffer)) $el))))
                ((@ this $el html) html))))
 
@@ -185,7 +190,9 @@
    (let ((app-view (new (*View *App-view app))))
      ((@ ($ 'body) html) (@ app-view $el))
      ((@ ($ document) bind) 'click (lambda (e)
-                                    ((@ ($ ".MinibufferEditorView") select)))))))
+                                     (unless (or (= (@ e target tag-name) "INPUT")
+                                                 (= (@ e target tag-name) "TEXTAREA"))
+                                       ((@ ($ ".MinibufferEditorView") select))))))))
 ;     ((@ ($ document) bind) 'keydown (lambda (e)
 ;                                       (console.log (@ e char-code))))
    

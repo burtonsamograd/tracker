@@ -117,11 +117,13 @@ var Channel = { type : 'Channel',
         (THIS.ADD (NEW (*CLASS *CHANNEL (+ Channel  I) I ((@ THIS SIZE))))))
       (THIS.ON CLOSE-CHANNEL
        (LAMBDA (E)
-         (LET ((I ((@ THIS INDEX-OF) E.VALUE)))
-           (THIS.REMOVE E.VALUE)
-           (DO ((J I (INCF J)))
-               ((= J THIS.LENGTH))
-             ((@ ((@ THIS AT) J) INDEX) J)))))
+         (IF (> THIS.LENGTH 1)
+             (LET ((I ((@ THIS INDEX-OF) E.VALUE)))
+               (THIS.REMOVE E.VALUE)
+               (DO ((J I (INCF J)))
+                   ((= J THIS.LENGTH))
+                 ((@ ((@ THIS AT) J) INDEX) J)))
+             (ALERT I'm sorry Dave, but you can't delete the last channel.))))
       (THIS.ON ADD-CHANNEL
        (LAMBDA (E)
          (LET ((I ((@ THIS INDEX-OF) E.VALUE)))
@@ -162,13 +164,17 @@ var Pattern = { type : 'Pattern',
         this.add(new Class(Channel, 'Channel ' + i, i, this.size()));
     };
     this.on('close-channel', function (e) {
-        var i = this.indexOf(e.value);
-        this.remove(e.value);
-        var j = i;
-        for (; j !== this.length; ) {
-            this.at(j).index(j);
-            var _js2 = ++j;
-            j = _js2;
+        if (this.length > 1) {
+            var i = this.indexOf(e.value);
+            this.remove(e.value);
+            var j = i;
+            for (; j !== this.length; ) {
+                this.at(j).index(j);
+                var _js2 = ++j;
+                j = _js2;
+            };
+        } else {
+            return alert('I\'m sorry Dave, but you can\'t delete the last channel.');
         };
     });
     this.on('add-channel', function (e) {
@@ -221,7 +227,11 @@ var Pattern = { type : 'Pattern',
       (THIS.CREATE 'PAN (OR PAN 128))
       (DOTIMES (I ((@ THIS SIZE)))
         (THIS.ADD (NEW (*CLASS *PATTERN (+ Pattern  I)))))
-      (THIS.ON CLOSE-PATTERN (LAMBDA (E) (THIS.REMOVE E.VALUE)))
+      (THIS.ON CLOSE-PATTERN
+       (LAMBDA (E)
+         (IF (> THIS.LENGTH 1)
+             (THIS.REMOVE E.VALUE)
+             (ALERT I'm sorry Dave, but you can't delete the last pattern.))))
       (THIS.ON ADD-PATTERN
        (LAMBDA (E)
          (LET ((I ((@ THIS INDEX-OF) E.VALUE)))
@@ -258,7 +268,7 @@ var Song = { type : 'Song',
         this.add(new Class(Pattern, 'Pattern ' + i));
     };
     this.on('close-pattern', function (e) {
-        return this.remove(e.value);
+        return this.length > 1 ? this.remove(e.value) : alert('I\'m sorry Dave, but you can\'t delete the last pattern.');
     });
     this.on('add-pattern', function (e) {
         var i = this.indexOf(e.value);
@@ -835,7 +845,7 @@ var SongPatternEditSelectView = { type : 'SongPatternEditSelectView',
     return this.create('nameSelector', new View(SongPatternEditNameSelectorView, this.song));
 },
                                   render : function () {
-    var html = ['Pattern Select', this.nameSelector().$el];
+    var html = ['Pattern Order', this.nameSelector().$el];
     return this.$el.html(html);
 }
                                 };
@@ -936,6 +946,129 @@ var SongView = { type : 'SongView',
     return this.$el.html(html);
 }
                };
+/* (LOAD tools-view.ps) */
+var ToolsOpenPanelView = { type : 'ToolsOpenPanelView',
+                           model : 'app',
+                           className : 'ToolsButtonView',
+                           tagName : 'span',
+                           events : { 'click' : function (e) {
+    return this.trigger('open-tools-panel', this.app);
+} },
+                           render : function () {
+    var html = ['\u2935'];
+    return this.$el.html(html);
+}
+                         };
+var ToolsClosePanelView = { type : 'ToolsClosePanelView',
+                            model : 'app',
+                            className : 'ToolsButtonView',
+                            tagName : 'span',
+                            events : { 'click' : function (e) {
+    return this.trigger('close-tools-panel', this.app);
+} },
+                            render : function () {
+    var html = ['\u2934'];
+    return this.$el.html(html);
+}
+                          };
+var ToolsSamplerButtonView = { type : 'ToolsSamplerButtonView',
+                               model : 'app',
+                               className : 'ToolsButtonView',
+                               tagName : 'span',
+                               events : { 'click' : function (e) {
+    return this.trigger('open-sampler', this.app);
+} },
+                               render : function () {
+    var html = ['Sampler'];
+    return this.$el.html(html);
+}
+                             };
+var ToolsModularButtonView = { type : 'ToolsModularButtonView',
+                               model : 'app',
+                               className : 'ToolsButtonView',
+                               tagName : 'span',
+                               events : { 'click' : function (e) {
+    return this.trigger('open-modular', this.app);
+} },
+                               render : function () {
+    var html = ['Modular'];
+    return this.$el.html(html);
+}
+                             };
+var ToolsNotesButtonView = { type : 'ToolsNotesButtonView',
+                             model : 'app',
+                             className : 'ToolsButtonView',
+                             tagName : 'span',
+                             events : { 'click' : function (e) {
+    return this.trigger('open-notes', this.app);
+} },
+                             render : function () {
+    var html = ['Notes'];
+    return this.$el.html(html);
+}
+                           };
+var ToolsButtonsView = { type : 'ToolsButtonsView',
+                         model : 'app',
+                         init : function (model) {
+    this.create('samplerButton', new View(ToolsSamplerButtonView, this.app));
+    this.create('modularButton', new View(ToolsModularButtonView, this.app));
+    return this.create('notesButton', new View(ToolsNotesButtonView, this.app));
+},
+                         render : function () {
+    var html = [this.samplerButton().$el, this.modularButton().$el, this.notesButton().$el];
+    return this.$el.html(html);
+}
+                       };
+var ToolsDummyView = { type : 'ToolsDummyView',
+                       model : 'app',
+                       tagName : 'span',
+                       render : function () {
+    var html = ['No tool selected.'];
+    return this.$el.html(html);
+}
+                     };
+var ToolsNotesView = { type : 'ToolsNotesView',
+                       model : 'app',
+                       className : 'ToolsAreaView',
+                       render : function () {
+    var html = [$('<textarea style=\'width:100%;height:100%\'>')];
+    return this.$el.html(html);
+}
+                     };
+var ToolsView = { type : 'ToolsView',
+                  model : 'app',
+                  init : function (model) {
+    this.create('openClosePanelButton', new View(ToolsOpenPanelView, this.app));
+    this.create('toolsButtons', new View(ToolsButtonsView, this.app));
+    this.create('toolsView', new View(ToolsDummyView, this.app));
+    this.create('notesView', new View(ToolsNotesView, this.app));
+    this.toolsView().$el.css({ display : 'none' });
+    this.on('open-tools-panel', function (e) {
+        this.toolsView().$el.css({ display : 'inherit' });
+        this.openClosePanelButton(new View(ToolsClosePanelView, this.app));
+        return this.render();
+    });
+    this.on('close-tools-panel', function (e) {
+        this.toolsView().$el.css({ display : 'none' });
+        this.openClosePanelButton(new View(ToolsOpenPanelView, this.app));
+        return this.render();
+    });
+    this.on('open-sampler', function (e) {
+        return this.toolsView().$el.css({ visibility : 'visible' });
+    });
+    this.on('open-modular', function (e) {
+        return this.toolsView().$el.css({ visibility : 'visible' });
+    });
+    return this.on('open-notes', function (e) {
+        this.toolsView(this.notesView());
+        return this.trigger('open-tools-panel');
+    });
+},
+                  render : function () {
+    var html = [this.openClosePanelButton().$el, this.toolsButtons().$el, this.toolsView().$el];
+    return this.$el.html(html);
+}
+                };
 /* (DEFVIEW *MINIBUFFER-VIEW MODEL app RENDER
     (LAMBDA ()
       ((@ THIS $EL HTML) <input class='MinibufferEditorView' type='text'>))) */
@@ -948,21 +1081,24 @@ var MinibufferView = { type : 'MinibufferView',
 /* (DEFVIEW *APP-VIEW MODEL app CONTAINS '*SONG-VIEW INIT
     (LAMBDA (MODEL)
       (THIS.CREATE 'MINIBUFFER (NEW (*VIEW *MINIBUFFER-VIEW THIS.APP)))
+      (THIS.CREATE 'TOOLS (NEW (*VIEW *TOOLS-VIEW THIS.APP)))
       (THIS.CREATE 'SONG (NEW (*VIEW *SONG-VIEW ((@ THIS APP AT) 0)))))
     RENDER
     (LAMBDA ()
       (LET ((HTML
-             (ARRAY (@ ((@ THIS SONG)) $EL) (@ ((@ THIS MINIBUFFER)) $EL))))
+             (ARRAY (@ ((@ THIS SONG)) $EL) (@ ((@ THIS TOOLS)) $EL)
+              (@ ((@ THIS MINIBUFFER)) $EL))))
         ((@ THIS $EL HTML) HTML)))) */
 var AppView = { type : 'AppView',
                 model : 'app',
                 contains : 'SongView',
                 init : function (model) {
     this.create('minibuffer', new View(MinibufferView, this.app));
+    this.create('tools', new View(ToolsView, this.app));
     return this.create('song', new View(SongView, this.app.at(0)));
 },
                 render : function () {
-    var html = [this.song().$el, this.minibuffer().$el];
+    var html = [this.song().$el, this.tools().$el, this.minibuffer().$el];
     return this.$el.html(html);
 }
               };
@@ -973,11 +1109,15 @@ var app = new Class(App);
       (LET ((APP-VIEW (NEW (*VIEW *APP-VIEW APP))))
         ((@ ($ 'BODY) HTML) (@ APP-VIEW $EL))
         ((@ ($ DOCUMENT) BIND) 'CLICK
-         (LAMBDA (E) ((@ ($ .MinibufferEditorView) SELECT))))))) */
+         (LAMBDA (E)
+           (UNLESS
+               (OR (= (@ E TARGET TAG-NAME) INPUT)
+                   (= (@ E TARGET TAG-NAME) TEXTAREA))
+             ((@ ($ .MinibufferEditorView) SELECT)))))))) */
 $(document).ready(function () {
     var appView = new View(AppView, app);
     $('body').html(appView.$el);
     return $(document).bind('click', function (e) {
-        return $('.MinibufferEditorView').select();
+        return !(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') ? $('.MinibufferEditorView').select() : null;
     });
 });
