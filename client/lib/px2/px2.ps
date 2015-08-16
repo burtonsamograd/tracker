@@ -34,9 +34,29 @@
 
 (defun add-parent (child parent name)
   (when (*Classp child)
-    ((@ child _parents push) parent)
-    ((@ parent once) (+ :change ":" name) (lambda (e)
-                                            ((@ child _parents remove) (@ e target))))))
+    (let (already-child)
+      ((@ (@ child _parents) for-each)
+       (lambda (p)
+         (setf already-child (or already-child (= parent p)))))
+      (unless already-child
+        ((@ child _parents push) parent)
+        (if name
+            ((@ parent once) (+ :change ":" name) (lambda (e)
+                                                    ((@ child _parents remove) (@ e target))))
+
+            ;; TODO: figure out how to remove this from the parent's action handlers
+            ;; after the object is removed!!! This shouldn't cause a major problem leaving
+            ;; it around, just a performance hit over time due to the excess handlers that
+            ;; could build up in the parent object.
+            ;; A fix is to actually implement this.off, which takes the return value from
+            ;; this.on and will remove the handler from the action list. The trick is to get
+            ;; the return value of the next call into the function that is being passed to
+            ;; it!
+            ((@ parent on) (+ :remove) (lambda (e)
+                                         (if (= e.target obj)
+                                             ((@ child _parents remove) (@ e target)))))
+            
+            )))))
 
 (defmethod *Class copy ()
   (let ((obj (new (*Class this.options))))
@@ -52,13 +72,32 @@
                                       (= (typeof this-prop) 'object))
                                   ((@ *JSON* parse) ((@ *JSON* stringify) this-prop))
                                   this-prop)))))
+    ;; copy actions
+    (setf (@ obj _actions) (create))
+    (for-in (action (@ this _actions))
+            (let ((old-actions (getprop this '_actions action))
+                  (new-actions (array)))
+              (dolist (old-action old-actions)
+                (if (= (@ old-action self) this)
+                    ((@ new-actions push)
+                        (create :message (@ old-action message)
+                                :fun (@ old-action fun)
+                                :self obj))
+                    ((@ new-actions push)
+                        (create :message (@ old-action message)
+                                :fun (@ old-action fun)
+                                :self (@ old-action self)))))
+              (setf (getprop obj '_actions action) new-actions)))
+    
     ;; copy storage
-    (setf (@ obj _storage)
-          (this.map (lambda (e)
-                     (if (*Classp e)
-                         ((@ e copy))
-                         ((@ *JSON* parse) ((@ *JSON* stringify) e))))))
-    (setf (@ obj length) (@ obj _storage length))
+    (let ((new-storage 
+           (this.map (lambda (e)
+                       (if (*Classp e)
+                           ((@ e copy))
+                           ((@ *JSON* parse) ((@ *JSON* stringify) e)))))))
+      (obj.clear t)
+      ((@ new-storage for-each) (lambda (e)
+                                  (obj.push e t))))
     obj))
   
 (defmethod *Class get (name silent)
@@ -171,8 +210,7 @@
 (defmethod *Class insert-at (i obj silent)
   ((@ (@ this _storage) splice) i 0 obj)
   (incf this.length)
-  (when (*Classp obj)
-    ((@ obj _parents push) this))
+  (add-parent obj this)
   (unless silent
     (trigger this
              :add obj
