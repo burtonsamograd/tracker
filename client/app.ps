@@ -2,11 +2,18 @@
 (load "macros.ps")
 (load "utils.ps")
 
-(defvar default-num-channels 4)
-(defvar default-pattern-size 16)
-(defvar default-num-patterns 4)
-(defvar default-tempo 0x80)
-(defvar default-tics-per-beat 6)
+(defmodel *Options
+    defaults (create
+              default-song-name "untitled"
+              default-pattern-name "Pattern"
+              default-channel-name "Channel"
+              default-num-channels 4
+              default-pattern-size 16
+              default-num-patterns 4
+              default-tempo 0x80
+              default-tics-per-beat 6
+              default-gain 0x80
+              default-pan 0x80))
 
 (defmodel *Note
     init (lambda (instrument pitch fx arg)
@@ -17,10 +24,13 @@
            ))
 
 (defcontainer *Channel *Note
-  init (lambda (name index size)
+  init (lambda (&optional
+                  (name ((@ options default-channel-name)))
+                  (index 0)
+                  (size ((@ options default-pattern-size))))
          (this.create :name name)
          (this.create :index index)
-         (this.create :size (or size default-pattern-size))
+         (this.create :size size)
          (this.create :gain 128)
          (this.create :pan 128)
          (this.create :mute f)
@@ -55,11 +65,15 @@
             (new (*Class *Note)) t))))
 
 (defcontainer *Pattern *Channel
-  init (lambda (name size)
+  init (lambda (&optional
+                  (name ((@ options default-pattern-name)))
+                  (size ((@ options default-pattern-size)))
+                  (num-channels ((@ options default-num-channels))))
          (this.create :name name)
-         (this.create :size (or size default-pattern-size))
-         (dotimes (i default-num-channels)
-           (this.add (new (*Class *Channel (+ "Channel " i) i ((@ this size))))))
+         (this.create :size size)
+         (dotimes (i num-channels)
+           (this.add (new (*Class *Channel (+ ((@ options default-channel-name)) " "  i)
+                                  i ((@ this size))))))
 
          (this.on :close-channel
                   (lambda (e)
@@ -75,7 +89,10 @@
                   (lambda (e)
                     (let ((i ((@ this index-of) e.value)))
                       ((@ this insert-at) (1+ i)
-                       (new (*Class *Channel (+ "New " i) (1+ i) ((@ this size)))))
+                       (new (*Class *Channel (+ ((@ options default-channel-name)) " "
+                                                (+ this.length 1))
+                                    (1+ i)
+                                    ((@ this size)))))
                       (do ((j (1+ i) (incf j)))
                           ((= j this.length))
                         ((@ ((@ this at) j) index) j))
@@ -112,15 +129,21 @@
          ))
 
 (defcontainer *Song *Pattern
-  init (lambda (name size tempo tics-per-beat gain pan)
-         (this.create 'size (or size default-num-patterns))
-         (this.create 'name (or name index))
-         (this.create 'tempo (or tempo default-tempo))
-         (this.create 'tics-per-beat (or tics-per-beat default-tics-per-beat))
-         (this.create 'gain (or gain 128))
-         (this.create 'pan (or pan 128))
+  init (lambda (&optional
+                  (name ((@ options default-song-name)))
+                  (tempo ((@ options default-tempo)))
+                  (tics-per-beat ((@ options default-tics-per-beat)))
+                  (gain ((@ options default-gain)))
+                  (pan ((@ options default-pan)))
+                  (num-patterns ((@ options default-num-patterns))))
+         (this.create 'name name)
+         (this.create 'tempo tempo)
+         (this.create 'tics-per-beat tics-per-beat)
+         (this.create 'gain gain)
+         (this.create 'pan pan)
+         (this.create 'size num-patterns)
          (dotimes (i ((@ this size)))
-           (this.add (new (*Class *Pattern (+ "Pattern " i)))))
+           (this.add (new (*Class *Pattern (+ ((@ options default-pattern-name)) " " i)))))
 
          (this.on :close-pattern
                   (lambda (e)
@@ -130,7 +153,9 @@
          (this.on :add-pattern
                   (lambda (e)
                     (let ((i ((@ this index-of) e.value)))
-                      ((@ this insert-at) (1+ i) (new (*Class *Pattern "--"))))))
+                      ((@ this insert-at) (1+ i)
+                       (new (*Class *Pattern (+ ((@ options default-pattern-name)) " "
+                                                (1+ this.length))))))))
          (this.on :copy-pattern
                   (lambda (e)
                     (let ((i ((@ this index-of) e.value))
@@ -154,9 +179,12 @@
          ))
 
 (defcontainer *App *Song
-  init (lambda (name)
-         (this.create 'name (or name "untitled"))
-         (this.add (new (*Class *Song ((@ this name)))))))
+  init (lambda ()
+         (this.create 'song (new (*Class *Song)))
+         ((@ this add) ((@ this song)))
+         ))
+
+         
 
 (load "common-views.ps")
 (load "note-view.ps")
@@ -176,7 +204,7 @@
     init (lambda (model)
            (this.create 'minibuffer (new (*View *Minibuffer-view this.app)))
            (this.create 'tools (new (*View *Tools-view this.app)))
-           (this.create 'song (new (*View *Song-view ((@ this app at) 0)))))
+           (this.create 'song (new (*View *Song-view ((@ this app song))))))
     render (lambda ()
              (let ((html (array
                           (@ ((@ this song)) $el)
@@ -184,7 +212,9 @@
                           (@ ((@ this minibuffer)) $el))))
                ((@ this $el html) html))))
 
+(defvar options (new (*Class *Options)))
 (defvar app (new (*Class *App)))
+
 ((@ ($ document) ready)
  (lambda ()
    (let ((app-view (new (*View *App-view app))))

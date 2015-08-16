@@ -14,16 +14,22 @@ function hex(x, len) {
         return s;
     };
 };
-/* (DEFVAR DEFAULT-NUM-CHANNELS 4) */
-var defaultNumChannels = 4;
-/* (DEFVAR DEFAULT-PATTERN-SIZE 16) */
-var defaultPatternSize = 16;
-/* (DEFVAR DEFAULT-NUM-PATTERNS 4) */
-var defaultNumPatterns = 4;
-/* (DEFVAR DEFAULT-TEMPO 0X80) */
-var defaultTempo = 0x80;
-/* (DEFVAR DEFAULT-TICS-PER-BEAT 6) */
-var defaultTicsPerBeat = 6;
+/* (DEFMODEL *OPTIONS DEFAULTS
+    (CREATE DEFAULT-SONG-NAME untitled DEFAULT-PATTERN-NAME Pattern
+     DEFAULT-CHANNEL-NAME Channel DEFAULT-NUM-CHANNELS 4 DEFAULT-PATTERN-SIZE
+     16 DEFAULT-NUM-PATTERNS 4 DEFAULT-TEMPO 0X80 DEFAULT-TICS-PER-BEAT 6
+     DEFAULT-GAIN 0X80 DEFAULT-PAN 0X80)) */
+var Options = { type : 'Options', defaults : { defaultSongName : 'untitled',
+                                               defaultPatternName : 'Pattern',
+                                               defaultChannelName : 'Channel',
+                                               defaultNumChannels : 4,
+                                               defaultPatternSize : 16,
+                                               defaultNumPatterns : 4,
+                                               defaultTempo : 0x80,
+                                               defaultTicsPerBeat : 6,
+                                               defaultGain : 0x80,
+                                               defaultPan : 0x80
+                                             } };
 /* (DEFMODEL *NOTE INIT
     (LAMBDA (INSTRUMENT PITCH FX ARG)
       (THIS.CREATE INSTRUMENT INSTRUMENT)
@@ -37,10 +43,12 @@ var Note = { type : 'Note', init : function (instrument, pitch, fx, arg) {
     return this.create('arg', arg);
 } };
 /* (DEFCONTAINER *CHANNEL *NOTE INIT
-    (LAMBDA (NAME INDEX SIZE)
+    (LAMBDA
+        (&OPTIONAL (NAME ((@ OPTIONS DEFAULT-CHANNEL-NAME))) (INDEX 0)
+         (SIZE ((@ OPTIONS DEFAULT-PATTERN-SIZE))))
       (THIS.CREATE NAME NAME)
       (THIS.CREATE INDEX INDEX)
-      (THIS.CREATE SIZE (OR SIZE DEFAULT-PATTERN-SIZE))
+      (THIS.CREATE SIZE SIZE)
       (THIS.CREATE GAIN 128)
       (THIS.CREATE PAN 128)
       (THIS.CREATE MUTE F)
@@ -68,9 +76,18 @@ var Note = { type : 'Note', init : function (instrument, pitch, fx, arg) {
 var Channel = { type : 'Channel',
                 contains : 'Note',
                 init : function (name, index, size) {
+    if (name === undefined) {
+        name = options.defaultChannelName();
+    };
+    if (index === undefined) {
+        index = 0;
+    };
+    if (size === undefined) {
+        size = options.defaultPatternSize();
+    };
     this.create('name', name);
     this.create('index', index);
-    this.create('size', size || defaultPatternSize);
+    this.create('size', size);
     this.create('gain', 128);
     this.create('pan', 128);
     this.create('mute', false);
@@ -110,11 +127,17 @@ var Channel = { type : 'Channel',
 }
               };
 /* (DEFCONTAINER *PATTERN *CHANNEL INIT
-    (LAMBDA (NAME SIZE)
+    (LAMBDA
+        (&OPTIONAL (NAME ((@ OPTIONS DEFAULT-PATTERN-NAME)))
+         (SIZE ((@ OPTIONS DEFAULT-PATTERN-SIZE)))
+         (NUM-CHANNELS ((@ OPTIONS DEFAULT-NUM-CHANNELS))))
       (THIS.CREATE NAME NAME)
-      (THIS.CREATE SIZE (OR SIZE DEFAULT-PATTERN-SIZE))
-      (DOTIMES (I DEFAULT-NUM-CHANNELS)
-        (THIS.ADD (NEW (*CLASS *CHANNEL (+ Channel  I) I ((@ THIS SIZE))))))
+      (THIS.CREATE SIZE SIZE)
+      (DOTIMES (I NUM-CHANNELS)
+        (THIS.ADD
+         (NEW
+          (*CLASS *CHANNEL (+ ((@ OPTIONS DEFAULT-CHANNEL-NAME))   I) I
+           ((@ THIS SIZE))))))
       (THIS.ON CLOSE-CHANNEL
        (LAMBDA (E)
          (IF (> THIS.LENGTH 1)
@@ -128,7 +151,10 @@ var Channel = { type : 'Channel',
        (LAMBDA (E)
          (LET ((I ((@ THIS INDEX-OF) E.VALUE)))
            ((@ THIS INSERT-AT) (1+ I)
-            (NEW (*CLASS *CHANNEL (+ New  I) (1+ I) ((@ THIS SIZE)))))
+            (NEW
+             (*CLASS *CHANNEL
+              (+ ((@ OPTIONS DEFAULT-CHANNEL-NAME))   (+ THIS.LENGTH 1)) (1+ I)
+              ((@ THIS SIZE)))))
            (DO ((J (1+ I) (INCF J)))
                ((= J THIS.LENGTH))
              ((@ ((@ THIS AT) J) INDEX) J)))))
@@ -157,11 +183,20 @@ var Channel = { type : 'Channel',
          (THIS.EACH (LAMBDA (CHANNEL) ((@ CHANNEL SIZE) ((@ THIS SIZE))))))))) */
 var Pattern = { type : 'Pattern',
                 contains : 'Channel',
-                init : function (name, size) {
+                init : function (name, size, numChannels) {
+    if (name === undefined) {
+        name = options.defaultPatternName();
+    };
+    if (size === undefined) {
+        size = options.defaultPatternSize();
+    };
+    if (numChannels === undefined) {
+        numChannels = options.defaultNumChannels();
+    };
     this.create('name', name);
-    this.create('size', size || defaultPatternSize);
-    for (var i = 0; i < defaultNumChannels; i += 1) {
-        this.add(new Class(Channel, 'Channel ' + i, i, this.size()));
+    this.create('size', size);
+    for (var i = 0; i < numChannels; i += 1) {
+        this.add(new Class(Channel, options.defaultChannelName() + ' ' + i, i, this.size()));
     };
     this.on('close-channel', function (e) {
         if (this.length > 1) {
@@ -179,7 +214,7 @@ var Pattern = { type : 'Pattern',
     });
     this.on('add-channel', function (e) {
         var i = this.indexOf(e.value);
-        this.insertAt(i + 1, new Class(Channel, 'New ' + i, i + 1, this.size()));
+        this.insertAt(i + 1, new Class(Channel, options.defaultChannelName() + ' ' + (this.length + 1), i + 1, this.size()));
         var j = i + 1;
         for (; j !== this.length; ) {
             this.at(j).index(j);
@@ -218,15 +253,21 @@ var Pattern = { type : 'Pattern',
 }
               };
 /* (DEFCONTAINER *SONG *PATTERN INIT
-    (LAMBDA (NAME SIZE TEMPO TICS-PER-BEAT GAIN PAN)
-      (THIS.CREATE 'SIZE (OR SIZE DEFAULT-NUM-PATTERNS))
-      (THIS.CREATE 'NAME (OR NAME INDEX))
-      (THIS.CREATE 'TEMPO (OR TEMPO DEFAULT-TEMPO))
-      (THIS.CREATE 'TICS-PER-BEAT (OR TICS-PER-BEAT DEFAULT-TICS-PER-BEAT))
-      (THIS.CREATE 'GAIN (OR GAIN 128))
-      (THIS.CREATE 'PAN (OR PAN 128))
+    (LAMBDA
+        (&OPTIONAL (NAME ((@ OPTIONS DEFAULT-SONG-NAME)))
+         (TEMPO ((@ OPTIONS DEFAULT-TEMPO)))
+         (TICS-PER-BEAT ((@ OPTIONS DEFAULT-TICS-PER-BEAT)))
+         (GAIN ((@ OPTIONS DEFAULT-GAIN))) (PAN ((@ OPTIONS DEFAULT-PAN)))
+         (NUM-PATTERNS ((@ OPTIONS DEFAULT-NUM-PATTERNS))))
+      (THIS.CREATE 'NAME NAME)
+      (THIS.CREATE 'TEMPO TEMPO)
+      (THIS.CREATE 'TICS-PER-BEAT TICS-PER-BEAT)
+      (THIS.CREATE 'GAIN GAIN)
+      (THIS.CREATE 'PAN PAN)
+      (THIS.CREATE 'SIZE NUM-PATTERNS)
       (DOTIMES (I ((@ THIS SIZE)))
-        (THIS.ADD (NEW (*CLASS *PATTERN (+ Pattern  I)))))
+        (THIS.ADD
+         (NEW (*CLASS *PATTERN (+ ((@ OPTIONS DEFAULT-PATTERN-NAME))   I)))))
       (THIS.ON CLOSE-PATTERN
        (LAMBDA (E)
          (IF (> THIS.LENGTH 1)
@@ -235,7 +276,10 @@ var Pattern = { type : 'Pattern',
       (THIS.ON ADD-PATTERN
        (LAMBDA (E)
          (LET ((I ((@ THIS INDEX-OF) E.VALUE)))
-           ((@ THIS INSERT-AT) (1+ I) (NEW (*CLASS *PATTERN --))))))
+           ((@ THIS INSERT-AT) (1+ I)
+            (NEW
+             (*CLASS *PATTERN
+              (+ ((@ OPTIONS DEFAULT-PATTERN-NAME))   (1+ THIS.LENGTH))))))))
       (THIS.ON COPY-PATTERN
        (LAMBDA (E)
          (LET ((I ((@ THIS INDEX-OF) E.VALUE)) (NEW-PATTERN (E.VALUE.COPY)))
@@ -257,22 +301,40 @@ var Pattern = { type : 'Pattern',
                (THIS.SWAP I (1+ I)))))))) */
 var Song = { type : 'Song',
              contains : 'Pattern',
-             init : function (name, size, tempo, ticsPerBeat, gain, pan) {
-    this.create('size', size || defaultNumPatterns);
-    this.create('name', name || index);
-    this.create('tempo', tempo || defaultTempo);
-    this.create('ticsPerBeat', ticsPerBeat || defaultTicsPerBeat);
-    this.create('gain', gain || 128);
-    this.create('pan', pan || 128);
+             init : function (name, tempo, ticsPerBeat, gain, pan, numPatterns) {
+    if (name === undefined) {
+        name = options.defaultSongName();
+    };
+    if (tempo === undefined) {
+        tempo = options.defaultTempo();
+    };
+    if (ticsPerBeat === undefined) {
+        ticsPerBeat = options.defaultTicsPerBeat();
+    };
+    if (gain === undefined) {
+        gain = options.defaultGain();
+    };
+    if (pan === undefined) {
+        pan = options.defaultPan();
+    };
+    if (numPatterns === undefined) {
+        numPatterns = options.defaultNumPatterns();
+    };
+    this.create('name', name);
+    this.create('tempo', tempo);
+    this.create('ticsPerBeat', ticsPerBeat);
+    this.create('gain', gain);
+    this.create('pan', pan);
+    this.create('size', numPatterns);
     for (var i = 0; i < this.size(); i += 1) {
-        this.add(new Class(Pattern, 'Pattern ' + i));
+        this.add(new Class(Pattern, options.defaultPatternName() + ' ' + i));
     };
     this.on('close-pattern', function (e) {
         return this.length > 1 ? this.remove(e.value) : alert('I\'m sorry Dave, but you can\'t delete the last pattern.');
     });
     this.on('add-pattern', function (e) {
         var i = this.indexOf(e.value);
-        return this.insertAt(i + 1, new Class(Pattern, '--'));
+        return this.insertAt(i + 1, new Class(Pattern, options.defaultPatternName() + ' ' + (this.length + 1)));
     });
     this.on('copy-pattern', function (e) {
         var i = this.indexOf(e.value);
@@ -295,14 +357,14 @@ var Song = { type : 'Song',
 }
            };
 /* (DEFCONTAINER *APP *SONG INIT
-    (LAMBDA (NAME)
-      (THIS.CREATE 'NAME (OR NAME untitled))
-      (THIS.ADD (NEW (*CLASS *SONG ((@ THIS NAME))))))) */
+    (LAMBDA ()
+      (THIS.CREATE 'SONG (NEW (*CLASS *SONG)))
+      ((@ THIS ADD) ((@ THIS SONG))))) */
 var App = { type : 'App',
             contains : 'Song',
-            init : function (name) {
-    this.create('name', name || 'untitled');
-    return this.add(new Class(Song, this.name()));
+            init : function () {
+    this.create('song', new Class(Song));
+    return this.add(this.song());
 }
           };
 /* (LOAD common-views.ps) */
@@ -1012,7 +1074,31 @@ var ToolsButtonsView = { type : 'ToolsButtonsView',
                          init : function (model) {
     this.create('samplerButton', new View(ToolsSamplerButtonView, this.app));
     this.create('modularButton', new View(ToolsModularButtonView, this.app));
-    return this.create('notesButton', new View(ToolsNotesButtonView, this.app));
+    this.create('notesButton', new View(ToolsNotesButtonView, this.app));
+    this.add(this.samplerButton());
+    this.add(this.modularButton());
+    this.add(this.notesButton());
+    this.on('open-sampler', function () {
+        this.select(this.samplerButton());
+        return true;
+    });
+    this.on('open-modular', function () {
+        this.select(this.modularButton());
+        return true;
+    });
+    return this.on('open-notes', function () {
+        this.select(this.notesButton());
+        return true;
+    });
+},
+                         deselect : function () {
+    return this.each(function (buttonView) {
+        return buttonView.$el.removeClass('ToolsButtonSelected');
+    });
+},
+                         select : function (button) {
+    this.deselect();
+    return button.$el.addClass('ToolsButtonSelected');
 },
                          render : function () {
     var html = [this.samplerButton().$el, this.modularButton().$el, this.notesButton().$el];
@@ -1027,6 +1113,28 @@ var ToolsDummyView = { type : 'ToolsDummyView',
     return this.$el.html(html);
 }
                      };
+var ToolsSamplerInstrumentListView = { type : 'ToolsSamplerInstrumentListView', model : 'app' };
+var ToolsSamplerInstrumentView = { type : 'ToolsSamplerInstrumentView', model : 'app' };
+var ToolsSamplerView = { type : 'ToolsSamplerView',
+                         model : 'app',
+                         className : 'ToolsAreaView',
+                         init : function (model) {
+    this.create('instrumentList', new View(ToolsSamplerInstrumentListView, this.app));
+    return this.create('instrument', new View(ToolsSamplerInstrumentView, this.app));
+},
+                         render : function () {
+    var html = [this.instrumentList().$el, this.instrument().$el];
+    return this.$el.html(html);
+}
+                       };
+var ToolsModularView = { type : 'ToolsModularView',
+                         model : 'app',
+                         className : 'ToolsAreaView',
+                         render : function () {
+    var html = ['Modular'];
+    return this.$el.html(html);
+}
+                       };
 var ToolsNotesView = { type : 'ToolsNotesView',
                        model : 'app',
                        className : 'ToolsAreaView',
@@ -1042,6 +1150,8 @@ var ToolsView = { type : 'ToolsView',
     this.create('toolsButtons', new View(ToolsButtonsView, this.app));
     this.create('toolsView', new View(ToolsDummyView, this.app));
     this.create('notesView', new View(ToolsNotesView, this.app));
+    this.create('samplerView', new View(ToolsSamplerView, this.app));
+    this.create('modularView', new View(ToolsModularView, this.app));
     this.toolsView().$el.css({ display : 'none' });
     this.on('open-tools-panel', function (e) {
         this.toolsView().$el.css({ display : 'inherit' });
@@ -1051,13 +1161,16 @@ var ToolsView = { type : 'ToolsView',
     this.on('close-tools-panel', function (e) {
         this.toolsView().$el.css({ display : 'none' });
         this.openClosePanelButton(new View(ToolsOpenPanelView, this.app));
+        this.toolsButtons().deselect();
         return this.render();
     });
     this.on('open-sampler', function (e) {
-        return this.toolsView().$el.css({ visibility : 'visible' });
+        this.toolsView(this.samplerView());
+        return this.trigger('open-tools-panel');
     });
     this.on('open-modular', function (e) {
-        return this.toolsView().$el.css({ visibility : 'visible' });
+        this.toolsView(this.modularView());
+        return this.trigger('open-tools-panel');
     });
     return this.on('open-notes', function (e) {
         this.toolsView(this.notesView());
@@ -1082,7 +1195,7 @@ var MinibufferView = { type : 'MinibufferView',
     (LAMBDA (MODEL)
       (THIS.CREATE 'MINIBUFFER (NEW (*VIEW *MINIBUFFER-VIEW THIS.APP)))
       (THIS.CREATE 'TOOLS (NEW (*VIEW *TOOLS-VIEW THIS.APP)))
-      (THIS.CREATE 'SONG (NEW (*VIEW *SONG-VIEW ((@ THIS APP AT) 0)))))
+      (THIS.CREATE 'SONG (NEW (*VIEW *SONG-VIEW ((@ THIS APP SONG))))))
     RENDER
     (LAMBDA ()
       (LET ((HTML
@@ -1095,13 +1208,15 @@ var AppView = { type : 'AppView',
                 init : function (model) {
     this.create('minibuffer', new View(MinibufferView, this.app));
     this.create('tools', new View(ToolsView, this.app));
-    return this.create('song', new View(SongView, this.app.at(0)));
+    return this.create('song', new View(SongView, this.app.song()));
 },
                 render : function () {
     var html = [this.song().$el, this.tools().$el, this.minibuffer().$el];
     return this.$el.html(html);
 }
               };
+/* (DEFVAR OPTIONS (NEW (*CLASS *OPTIONS))) */
+var options = new Class(Options);
 /* (DEFVAR APP (NEW (*CLASS *APP))) */
 var app = new Class(App);
 /* ((@ ($ DOCUMENT) READY)
