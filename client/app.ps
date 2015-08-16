@@ -5,6 +5,8 @@
 (defvar default-num-channels 4)
 (defvar default-pattern-size 16)
 (defvar default-num-patterns 4)
+(defvar default-tempo 0x80)
+(defvar default-tics-per-beat 6)
 
 (defmodel *Note
     init (lambda (instrument pitch fx arg)
@@ -15,9 +17,10 @@
            ))
 
 (defcontainer *Channel *Note
-  init (lambda (name size)
-         (this.create :size (or size default-pattern-size))
+  init (lambda (name index size)
          (this.create :name name)
+         (this.create :index index)
+         (this.create :size (or size default-pattern-size))
          (this.create :gain 128)
          (this.create :pan 128)
          (this.create :mute f)
@@ -56,29 +59,51 @@
          (this.create :name name)
          (this.create :size (or size default-pattern-size))
          (dotimes (i default-num-channels)
-           (this.add (new (*Class *Channel i ((@ this size))))))
+           (this.add (new (*Class *Channel (+ "Channel " i) i ((@ this size))))))
 
          (this.on :close-channel
                   (lambda (e)
-                    (this.remove e.value)))
+                    (let ((i ((@ this index-of) e.value)))
+                      (this.remove e.value)
+                      (do ((j i (incf j)))
+                          ((= j this.length))
+                        ((@ ((@ this at) j) index) j))
+                      )))
+
          (this.on :add-channel
                   (lambda (e)
                     (let ((i ((@ this index-of) e.value)))
-                      ((@ this insert-at) (1+ i) (new (*Class *Channel "--" ((@ this size))))))))
+                      ((@ this insert-at) (1+ i)
+                       (new (*Class *Channel (+ "New " i) (1+ i) ((@ this size)))))
+                      (do ((j (1+ i) (incf j)))
+                          ((= j this.length))
+                        ((@ ((@ this at) j) index) j))
+                      )))
+
          (this.on :copy-channel
                   (lambda (e)
-                    (let ((i ((@ this index-of) e.value)))
-                      ((@ this insert-at) (1+ i) (e.value.copy)))))
+                    (let ((i ((@ this index-of) e.value))
+                          (new-channel (e.value.copy)))
+                      ((@ new-channel index) (1+ i))
+                      ((@ this insert-at) (1+ i) new-channel)
+                      ((@ new-channel name) (+ ((@ e.value name)) " ⎘")))))
+
          (this.on :move-channel-left
                   (lambda (e)
                     (let ((i ((@ this index-of) e.value)))
-                      (if (> i 0)
-                          (this.swap i (1- i))))))
+                      (when (> i 0)
+                        (this.swap i (1- i))
+                        ((@ ((@ this at) i) index) i)
+                        ((@ e.value index) (1- i))))))
+
          (this.on :move-channel-right
                   (lambda (e)
                     (let ((i ((@ this index-of) e.value)))
-                      (if (< i (- this.length 1))
-                          (this.swap i (1+ i))))))
+                      (when (< i (- this.length 1))
+                        (this.swap i (1+ i))
+                        ((@ ((@ this at) i) index) i)
+                        ((@ e.value index) (1+ i))))))
+
 
          (this.on "change:size" (lambda (e)
                                   (this.each (lambda (channel)
@@ -86,11 +111,15 @@
          ))
 
 (defcontainer *Song *Pattern
-  init (lambda (name size)
+  init (lambda (name size tempo tics-per-beat gain pan)
          (this.create 'size (or size default-num-patterns))
          (this.create 'name (or name index))
+         (this.create 'tempo (or tempo default-tempo))
+         (this.create 'tics-per-beat (or tics-per-beat default-tics-per-beat))
+         (this.create 'gain (or gain 128))
+         (this.create 'pan (or pan 128))
          (dotimes (i ((@ this size)))
-           (this.add (new (*Class *Pattern i))))
+           (this.add (new (*Class *Pattern (+ "Pattern " i)))))
 
          (this.on :close-pattern
                   (lambda (e)
@@ -101,8 +130,14 @@
                       ((@ this insert-at) (1+ i) (new (*Class *Pattern "--"))))))
          (this.on :copy-pattern
                   (lambda (e)
+                    (let ((i ((@ this index-of) e.value))
+                          (new-pattern (e.value.copy)))
+                      ((@ this insert-at) (1+ i) new-pattern)
+                      ((@ new-pattern name) (+ ((@ e.value name)) " ⎘")))))
+         (this.on :link-pattern
+                  (lambda (e)
                     (let ((i ((@ this index-of) e.value)))
-                      ((@ this insert-at) (1+ i) (e.value.copy)))))
+                      ((@ this insert-at) (1+ i) e.value))))
          (this.on :move-pattern-up
                   (lambda (e)
                     (let ((i ((@ this index-of) e.value)))

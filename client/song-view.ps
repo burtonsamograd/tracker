@@ -1,0 +1,64 @@
+;; -*- mode: lisp -*-
+
+(load "song-pattern-edit-select-view.ps")
+(load "instrument-select-view.ps")
+(deftext-edit-view *Song-name-view 'song "SongControlsView" "SongControlsTitleEditView"
+                   *String-value-edit-view  "Title:" this.song.name 32)
+(deftext-edit-view *Song-tempo-view 'song "SongControlsView" "SongControlsEditView"
+                   *Hex-value-edit-view "Tempo:" this.song.tempo)
+(deftext-edit-view *Song-tpb-view 'song "SongControlsView" "SongControlsEditView"
+                   *Hex-value-edit-view "TPB:" (@ this song tics-per-beat))
+(deftext-edit-view *Song-gain-view 'song "SongControlsView" "SongControlsEditView"
+                   *Hex-value-edit-view  "Gain:" (@ this song gain))
+(deftext-edit-view *Song-pan-view 'song "SongControlsView" "SongControlsEditView"
+                   *Hex-value-edit-view "Pan:" (@ this song pan))
+
+(defview *Song-controls-view
+    model "song"
+    init (lambda (mode)
+           (this.create 'name-edit (new (*View *Song-name-view this.song)))
+           (this.create 'tempo-edit (new (*View *Song-tempo-view this.song)))
+           (this.create 'tpb-edit (new (*View *Song-tpb-view this.song)))
+           (this.create 'gain-edit (new (*View *Song-gain-view this.song)))
+           (this.create 'pan-edit (new (*View *Song-pan-view this.song))))
+    render (lambda ()
+             (let ((html (array
+                          (@ ((@ this gain-edit)) $el)
+                          (@ ((@ this pan-edit)) $el)
+                          (@ ((@ this tempo-edit)) $el)
+                          (@ ((@ this tpb-edit)) $el)
+                          (@ ((@ this name-edit)) $el)
+                          )))
+               ((@ this $el html) html))))
+
+(defview *Song-view
+    model "song"
+    init (lambda (model)
+           (this.create 'current-pattern)
+           (this.create 'pattern-editor)
+           (this.create 'pattern-edit-select
+                        (new (*View *Song-pattern-edit-select-view this.song)))
+           (this.create 'instrument-select
+                        (new (*View *Instrument-select-view this.song)))
+           (this.create 'song-controls
+                        (new (*View *Song-controls-view this.song)))
+
+           (this.on "change:currentPattern"
+                    (lambda (e)
+                      (this.set 'pattern-editor
+                                (new (*View *Pattern-view ((@ this current-pattern)))))
+                      (this.render)))
+           (this.set 'current-pattern ((@ this song at) 0))
+
+           (this.on 'select-pattern (lambda (e)
+                                      ((@ this current-pattern) e.value))))
+
+    render (lambda ()
+             (let ((html (array
+                          (@ ((@ this song-controls)) $el)
+                          (@ ((@ this pattern-edit-select)) $el)
+                          (@ ((@ this pattern-editor)) $el)
+                          (@ ((@ this instrument-select)) $el)
+                     )))
+               ((@ this $el html) html))))
+

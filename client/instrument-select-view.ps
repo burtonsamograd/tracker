@@ -1,0 +1,6 @@
+;; -*- mode: lisp -*-
+
+(defview *Instrument-select-view
+    model 'song
+    render (lambda ()
+             ((@ this $el html) "Instrument")))

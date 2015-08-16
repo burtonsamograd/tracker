@@ -1,0 +1,123 @@
+;; -*- mode: lisp -*-
+
+(deftiny-button-view *Pattern-move-up-button-view "↑" 'pattern :move-pattern-up)
+(deftiny-button-view *Pattern-move-down-button-view "↓" 'pattern :move-pattern-down)
+(deftiny-button-view *Pattern-add-button-view "+" 'pattern :add-pattern)
+(deftiny-button-view *Pattern-copy-button-view "⎘" 'pattern :copy-pattern)
+(deftiny-button-view *Pattern-link-button-view "⌘" 'pattern :link-pattern)
+(deftiny-button-view *Pattern-close-button-view "✗" 'pattern :close-pattern
+                     :confirm-message "Are you sure you want to delete this pattern?")
+ 
+(defview *Song-pattern-edit-select-buttons-view
+    model "pattern"
+    init (lambda (model)
+           (this.create 'up-button (new (*View *Pattern-move-up-button-view this.pattern)))
+           (this.create 'down-button (new (*View *Pattern-move-down-button-view this.pattern)))
+           (this.create 'add-button (new (*View *Pattern-add-button-view this.pattern)))
+           (this.create 'copy-button (new (*View *Pattern-copy-button-view this.pattern)))
+           (this.create 'link-button (new (*View *Pattern-link-button-view this.pattern)))
+           (this.create 'close-button (new (*View *Pattern-close-button-view this.pattern))))
+
+    render (lambda ()
+             (let ((html (array
+                          (@ ((@ this up-button)) $el)
+                          (@ ((@ this down-button)) $el)
+                          (@ ((@ this add-button)) $el)
+                          (@ ((@ this copy-button)) $el)
+                          (@ ((@ this link-button)) $el)
+                          (@ ((@ this close-button)) $el)
+                          )))
+               ((@ this $el html) html))))
+
+
+(defview *Song-pattern-index-view
+    model 'pattern
+    init (lambda (model index)
+           (setf this.index index))
+    render (lambda ()
+             ((@ this $el html) (+ (hex (@ this index)) ":"))))
+             
+(defview *Song-pattern-edit-select-name-view
+    model 'pattern
+    events (create
+            'click (lambda (e)
+                     (this.trigger 'select-pattern this.pattern)
+                     (this.select)))
+    
+    init (lambda (model index selected)
+           (this.create 'edit-view (new (*View *String-value-edit-view
+                                               this.pattern
+                                               "SongPatternEditSelectNameView"
+                                               (@ this pattern name)
+                                               32)))
+           (this.create 'index-view (new (*View *Song-pattern-index-view this.pattern index)))
+           (setf this.index index)
+           (this.create 'buttons
+                        (new (*View *Song-pattern-edit-select-buttons-view this.pattern)))
+           (when selected (this.select)))
+
+    select (lambda ()
+             ((@ this $el add-class) "SongPatternEditSelectNameSelectedView"))
+    deselect (lambda ()
+             ((@ this $el remove-class) "SongPatternEditSelectNameSelectedView"))
+    render (lambda ()
+             (let ((html (array
+                          (@ ((@ this index-view)) $el)
+                          (@ ((@ this buttons)) $el)
+                          (@ ((@ this edit-view)) $el)
+                          )))
+             ((@ this $el html) html))))
+    
+(defview *Song-pattern-edit-name-selector-view
+    model "song"
+    contains '*Song-pattern-edit-select-name-view
+
+    rebuild-views (lambda (selected-index)
+                    (let ((current 0))
+                      ((@ this song map)
+                       (lambda (pattern)
+                         (this.add (new (*View *Song-pattern-edit-select-name-view pattern
+                                               current (= current selected-index))) t)
+                         (incf current))
+                       this)))
+                    
+    
+    init (lambda (model)
+           (this.create 'current-pattern ((@ this song at) 0))
+
+           ((@ this rebuild-views) 0)
+
+           (this.on 'select-pattern
+                    (lambda (e)
+                      (this.map (lambda (pattern-name-view)
+                                  ((@ pattern-name-view deselect))))
+                      ((@ this current-pattern) e.value)
+                      t))
+
+           ;; TODO: optimize this like pattern-edit-view rebuild-views so we can
+           ;; have good performance with lots of patterns
+           (this.song.on :modified
+                         (lambda ()
+                           (this.clear t)
+                           (let ((pattern-index (or ((@ this song index-of)
+                                                     ((@ this current-pattern))) 0)))
+                             ((@ this current-pattern) ((@ this song at) pattern-index))
+                             (this.trigger 'select-pattern ((@ this current-pattern)))
+                             ((@ this rebuild-views) pattern-index)
+                             (this.render))) this))
+
+    render (lambda ()
+             (let ((html (this.map (lambda (name-view)
+                                     (@ name-view $el)))))
+               ((@ this $el html) html))))
+           
+(defview *Song-pattern-edit-select-view
+    model "song"
+    init (lambda (model)
+           (this.create 'name-selector
+                        (new (*View *Song-pattern-edit-name-selector-view this.song))))
+    render (lambda ()
+             (let ((html (array
+                          "Pattern Select"
+                          (@ ((@ this 'name-selector)) $el))))
+                     ((@ this $el html) html))))

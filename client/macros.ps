@@ -19,3 +19,34 @@
       type ',name
       ,@body)))
 
+(defmacro deftiny-button-view (name character model message
+                               &key confirm-message (class-name ""))
+  (let ((click-fn (if confirm-message
+                      `(lambda (e)
+                         (when (confirm ,confirm-message)
+                           ((@ this ,model trigger) ,message (@ this ,model))))
+                      `(lambda (e)
+                         ((@ this ,model trigger) ,message (@ this ,model)))))
+        (class-name (concatenate 'string "TinyButton " class-name)))
+  `(defview ,name
+       model ,model
+       class-name ,class-name
+       events (create
+               'click ,click-fn)
+       render (lambda ()
+                (this.$el.html ,character)))))
+
+(defmacro deftext-edit-view (name model class-name edit-view-class-name
+                             edit-view text change-fn &optional length)
+  `(defview ,name
+       model ,model
+       class-name ,class-name
+       init (lambda (model)
+              (this.create 'edit (new (*View ,edit-view (getprop this ,model)
+                                             ,edit-view-class-name ,change-fn ,length))))
+       render (lambda ()
+                (let ((html (array
+                             ,text
+                             (@ ((@ this edit)) $el))))
+                  ((@ this $el html) html)))))
+

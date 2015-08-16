@@ -25,6 +25,8 @@ input[type=text] {
 
 .ChannelNameView {
     text-align: center;
+    padding-top: .25em;
+    padding-bottom: .25em;
 }
 
 .PatternNameView {
@@ -49,6 +51,13 @@ input[type=text] {
 .ChannelControlsView {
     padding: .2em;
 }
+
+.ChannelIndexView {
+    padding-left: .5em;
+    display: inline-block;
+    font-size: smaller;
+}
+
 .ChannelGainView {
     display: inline;
 }
@@ -76,14 +85,22 @@ input[type=text] {
 }
 
 .SongView {
-    display: table-row
+}
+
+.InstrumentSelectView {
+    vertical-align: top;
+    display: table-cell;
+    padding: .25em;
+    border: 2px solid;
+    border-top: 4px solid;
 }
 
 .SongPatternEditSelectView {
     vertical-align: top;
     display: table-cell;
-    border: solid 2px;
     padding: .25em;
+    border: 2px solid;
+    border-top: 4px solid;
 }
 
 .SongPatternEditNameSelectorView {
@@ -98,10 +115,16 @@ input[type=text] {
 
 .SongPatternEditSelectNameSelectedView {
     background-color: orange;
+    border-bottom: 1px solid;
 }
 
 .SongPatternEditSelectButtonsView {
     float: right;
+}
+
+.SongPatternIndexView {
+    display: inline-block;
+    font-size: smaller;
 }
 
 .PatternView {
@@ -149,7 +172,7 @@ input[type=text] {
 }
 
 .ChannelCloseButton {
-    padding-left:  2em;
+    padding-left:  .5em;
 }
 
 .ChannelTitleView {
@@ -196,7 +219,30 @@ input[type=text] {
     border: 2px solid;
 }
 
+.SongControlsView {
+    padding: .25em;
+    display: inline-block;
+}
+
+.SongControlsEditView {
+    padding: .25em;
+    padding-right: .5em;
+    display: inline-block;
+    border-right: 1px solid;
+}
+
+.SongControlsTitleEditView {
+    padding: .25em;
+    padding-right: .5em;
+    display: inline-block;
+}
+
+.SongControlsView {
+}
+
 .AppView {
     margin: auto;
+    border: 4px solid;
+    border-radius: 8px 8px;
 }
 

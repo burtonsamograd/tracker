@@ -3,13 +3,16 @@
 
 /* (LOAD utils.ps) */
 function hex(x, len) {
-    var s;
     len = len || 2;
-    return x && (s = x.toString(16), (s.length < len ? (function () {
-        for (var i = 0; i < 1 + (len - s.length); i += 1) {
-            s = 0 + s;
+    if (typeof x === 'number') {
+        var s = x.toString(16);
+        if (s.length < len) {
+            for (var i = 0; i < 1 + (len - s.length); i += 1) {
+                s = 0 + s;
+            };
         };
-    })() : null, s));
+        return s;
+    };
 };
 /* (DEFVAR DEFAULT-NUM-CHANNELS 4) */
 var defaultNumChannels = 4;
@@ -17,6 +20,10 @@ var defaultNumChannels = 4;
 var defaultPatternSize = 16;
 /* (DEFVAR DEFAULT-NUM-PATTERNS 4) */
 var defaultNumPatterns = 4;
+/* (DEFVAR DEFAULT-TEMPO 0X80) */
+var defaultTempo = 0x80;
+/* (DEFVAR DEFAULT-TICS-PER-BEAT 6) */
+var defaultTicsPerBeat = 6;
 /* (DEFMODEL *NOTE INIT
     (LAMBDA (INSTRUMENT PITCH FX ARG)
       (THIS.CREATE INSTRUMENT INSTRUMENT)
@@ -30,9 +37,10 @@ var Note = { type : 'Note', init : function (instrument, pitch, fx, arg) {
     return this.create('arg', arg);
 } };
 /* (DEFCONTAINER *CHANNEL *NOTE INIT
-    (LAMBDA (NAME SIZE)
-      (THIS.CREATE SIZE (OR SIZE DEFAULT-PATTERN-SIZE))
+    (LAMBDA (NAME INDEX SIZE)
       (THIS.CREATE NAME NAME)
+      (THIS.CREATE INDEX INDEX)
+      (THIS.CREATE SIZE (OR SIZE DEFAULT-PATTERN-SIZE))
       (THIS.CREATE GAIN 128)
       (THIS.CREATE PAN 128)
       (THIS.CREATE MUTE F)
@@ -59,9 +67,10 @@ var Note = { type : 'Note', init : function (instrument, pitch, fx, arg) {
         ((@ THIS INSERT-AT) (1- (+ I OLD-VALUE)) (NEW (*CLASS *NOTE)) T)))) */
 var Channel = { type : 'Channel',
                 contains : 'Note',
-                init : function (name, size) {
-    this.create('size', size || defaultPatternSize);
+                init : function (name, index, size) {
     this.create('name', name);
+    this.create('index', index);
+    this.create('size', size || defaultPatternSize);
     this.create('gain', 128);
     this.create('pan', 128);
     this.create('mute', false);
@@ -105,27 +114,42 @@ var Channel = { type : 'Channel',
       (THIS.CREATE NAME NAME)
       (THIS.CREATE SIZE (OR SIZE DEFAULT-PATTERN-SIZE))
       (DOTIMES (I DEFAULT-NUM-CHANNELS)
-        (THIS.ADD (NEW (*CLASS *CHANNEL I ((@ THIS SIZE))))))
-      (THIS.ON CLOSE-CHANNEL (LAMBDA (E) (THIS.REMOVE E.VALUE)))
+        (THIS.ADD (NEW (*CLASS *CHANNEL (+ Channel  I) I ((@ THIS SIZE))))))
+      (THIS.ON CLOSE-CHANNEL
+       (LAMBDA (E)
+         (LET ((I ((@ THIS INDEX-OF) E.VALUE)))
+           (THIS.REMOVE E.VALUE)
+           (DO ((J I (INCF J)))
+               ((= J THIS.LENGTH))
+             ((@ ((@ THIS AT) J) INDEX) J)))))
       (THIS.ON ADD-CHANNEL
        (LAMBDA (E)
          (LET ((I ((@ THIS INDEX-OF) E.VALUE)))
            ((@ THIS INSERT-AT) (1+ I)
-            (NEW (*CLASS *CHANNEL -- ((@ THIS SIZE))))))))
+            (NEW (*CLASS *CHANNEL (+ New  I) (1+ I) ((@ THIS SIZE)))))
+           (DO ((J (1+ I) (INCF J)))
+               ((= J THIS.LENGTH))
+             ((@ ((@ THIS AT) J) INDEX) J)))))
       (THIS.ON COPY-CHANNEL
        (LAMBDA (E)
-         (LET ((I ((@ THIS INDEX-OF) E.VALUE)))
-           ((@ THIS INSERT-AT) (1+ I) (E.VALUE.COPY)))))
+         (LET ((I ((@ THIS INDEX-OF) E.VALUE)) (NEW-CHANNEL (E.VALUE.COPY)))
+           ((@ NEW-CHANNEL INDEX) (1+ I))
+           ((@ THIS INSERT-AT) (1+ I) NEW-CHANNEL)
+           ((@ NEW-CHANNEL NAME) (+ ((@ E.VALUE NAME))  ⎘)))))
       (THIS.ON MOVE-CHANNEL-LEFT
        (LAMBDA (E)
          (LET ((I ((@ THIS INDEX-OF) E.VALUE)))
-           (IF (> I 0)
-               (THIS.SWAP I (1- I))))))
+           (WHEN (> I 0)
+             (THIS.SWAP I (1- I))
+             ((@ ((@ THIS AT) I) INDEX) I)
+             ((@ E.VALUE INDEX) (1- I))))))
       (THIS.ON MOVE-CHANNEL-RIGHT
        (LAMBDA (E)
          (LET ((I ((@ THIS INDEX-OF) E.VALUE)))
-           (IF (< I (- THIS.LENGTH 1))
-               (THIS.SWAP I (1+ I))))))
+           (WHEN (< I (- THIS.LENGTH 1))
+             (THIS.SWAP I (1+ I))
+             ((@ ((@ THIS AT) I) INDEX) I)
+             ((@ E.VALUE INDEX) (1+ I))))))
       (THIS.ON change:size
        (LAMBDA (E)
          (THIS.EACH (LAMBDA (CHANNEL) ((@ CHANNEL SIZE) ((@ THIS SIZE))))))))) */
@@ -135,26 +159,50 @@ var Pattern = { type : 'Pattern',
     this.create('name', name);
     this.create('size', size || defaultPatternSize);
     for (var i = 0; i < defaultNumChannels; i += 1) {
-        this.add(new Class(Channel, i, this.size()));
+        this.add(new Class(Channel, 'Channel ' + i, i, this.size()));
     };
     this.on('close-channel', function (e) {
-        return this.remove(e.value);
+        var i = this.indexOf(e.value);
+        this.remove(e.value);
+        var j = i;
+        for (; j !== this.length; ) {
+            this.at(j).index(j);
+            var _js2 = ++j;
+            j = _js2;
+        };
     });
     this.on('add-channel', function (e) {
         var i = this.indexOf(e.value);
-        return this.insertAt(i + 1, new Class(Channel, '--', this.size()));
+        this.insertAt(i + 1, new Class(Channel, 'New ' + i, i + 1, this.size()));
+        var j = i + 1;
+        for (; j !== this.length; ) {
+            this.at(j).index(j);
+            var _js2 = ++j;
+            j = _js2;
+        };
     });
     this.on('copy-channel', function (e) {
         var i = this.indexOf(e.value);
-        return this.insertAt(i + 1, e.value.copy());
+        var newChannel = e.value.copy();
+        newChannel.index(i + 1);
+        this.insertAt(i + 1, newChannel);
+        return newChannel.name(e.value.name() + ' \u2398');
     });
     this.on('move-channel-left', function (e) {
         var i = this.indexOf(e.value);
-        return i > 0 ? this.swap(i, i - 1) : null;
+        if (i > 0) {
+            this.swap(i, i - 1);
+            this.at(i).index(i);
+            return e.value.index(i - 1);
+        };
     });
     this.on('move-channel-right', function (e) {
         var i = this.indexOf(e.value);
-        return i < this.length - 1 ? this.swap(i, i + 1) : null;
+        if (i < this.length - 1) {
+            this.swap(i, i + 1);
+            this.at(i).index(i);
+            return e.value.index(i + 1);
+        };
     });
     return this.on('change:size', function (e) {
         return this.each(function (channel) {
@@ -164,10 +212,15 @@ var Pattern = { type : 'Pattern',
 }
               };
 /* (DEFCONTAINER *SONG *PATTERN INIT
-    (LAMBDA (NAME SIZE)
+    (LAMBDA (NAME SIZE TEMPO TICS-PER-BEAT GAIN PAN)
       (THIS.CREATE 'SIZE (OR SIZE DEFAULT-NUM-PATTERNS))
       (THIS.CREATE 'NAME (OR NAME INDEX))
-      (DOTIMES (I ((@ THIS SIZE))) (THIS.ADD (NEW (*CLASS *PATTERN I))))
+      (THIS.CREATE 'TEMPO (OR TEMPO DEFAULT-TEMPO))
+      (THIS.CREATE 'TICS-PER-BEAT (OR TICS-PER-BEAT DEFAULT-TICS-PER-BEAT))
+      (THIS.CREATE 'GAIN (OR GAIN 128))
+      (THIS.CREATE 'PAN (OR PAN 128))
+      (DOTIMES (I ((@ THIS SIZE)))
+        (THIS.ADD (NEW (*CLASS *PATTERN (+ Pattern  I)))))
       (THIS.ON CLOSE-PATTERN (LAMBDA (E) (THIS.REMOVE E.VALUE)))
       (THIS.ON ADD-PATTERN
        (LAMBDA (E)
@@ -175,8 +228,13 @@ var Pattern = { type : 'Pattern',
            ((@ THIS INSERT-AT) (1+ I) (NEW (*CLASS *PATTERN --))))))
       (THIS.ON COPY-PATTERN
        (LAMBDA (E)
+         (LET ((I ((@ THIS INDEX-OF) E.VALUE)) (NEW-PATTERN (E.VALUE.COPY)))
+           ((@ THIS INSERT-AT) (1+ I) NEW-PATTERN)
+           ((@ NEW-PATTERN NAME) (+ ((@ E.VALUE NAME))  ⎘)))))
+      (THIS.ON LINK-PATTERN
+       (LAMBDA (E)
          (LET ((I ((@ THIS INDEX-OF) E.VALUE)))
-           ((@ THIS INSERT-AT) (1+ I) (E.VALUE.COPY)))))
+           ((@ THIS INSERT-AT) (1+ I) E.VALUE))))
       (THIS.ON MOVE-PATTERN-UP
        (LAMBDA (E)
          (LET ((I ((@ THIS INDEX-OF) E.VALUE)))
@@ -189,11 +247,15 @@ var Pattern = { type : 'Pattern',
                (THIS.SWAP I (1+ I)))))))) */
 var Song = { type : 'Song',
              contains : 'Pattern',
-             init : function (name, size) {
+             init : function (name, size, tempo, ticsPerBeat, gain, pan) {
     this.create('size', size || defaultNumPatterns);
     this.create('name', name || index);
+    this.create('tempo', tempo || defaultTempo);
+    this.create('ticsPerBeat', ticsPerBeat || defaultTicsPerBeat);
+    this.create('gain', gain || 128);
+    this.create('pan', pan || 128);
     for (var i = 0; i < this.size(); i += 1) {
-        this.add(new Class(Pattern, i));
+        this.add(new Class(Pattern, 'Pattern ' + i));
     };
     this.on('close-pattern', function (e) {
         return this.remove(e.value);
@@ -204,7 +266,13 @@ var Song = { type : 'Song',
     });
     this.on('copy-pattern', function (e) {
         var i = this.indexOf(e.value);
-        return this.insertAt(i + 1, e.value.copy());
+        var newPattern = e.value.copy();
+        this.insertAt(i + 1, newPattern);
+        return newPattern.name(e.value.name() + ' \u2398');
+    });
+    this.on('link-pattern', function (e) {
+        var i = this.indexOf(e.value);
+        return this.insertAt(i + 1, e.value);
     });
     this.on('move-pattern-up', function (e) {
         var i = this.indexOf(e.value);
@@ -337,7 +405,7 @@ var NoteView = { type : 'NoteView',
 /* (LOAD channel-view.ps) */
 var ChannelMoveLeftButtonView = { type : 'ChannelMoveLeftButtonView',
                                   model : 'channel',
-                                  className : 'TinyButton',
+                                  className : 'TinyButton ',
                                   events : { 'click' : function (e) {
     return this.channel.trigger('move-channel-left', this.channel);
 } },
@@ -347,7 +415,7 @@ var ChannelMoveLeftButtonView = { type : 'ChannelMoveLeftButtonView',
                                 };
 var ChannelMoveRightButtonView = { type : 'ChannelMoveRightButtonView',
                                    model : 'channel',
-                                   className : 'TinyButton',
+                                   className : 'TinyButton ',
                                    events : { 'click' : function (e) {
     return this.channel.trigger('move-channel-right', this.channel);
 } },
@@ -357,7 +425,7 @@ var ChannelMoveRightButtonView = { type : 'ChannelMoveRightButtonView',
                                  };
 var ChannelAddButtonView = { type : 'ChannelAddButtonView',
                              model : 'channel',
-                             className : 'TinyButton',
+                             className : 'TinyButton ',
                              events : { 'click' : function (e) {
     return this.channel.trigger('add-channel', this.channel);
 } },
@@ -367,7 +435,7 @@ var ChannelAddButtonView = { type : 'ChannelAddButtonView',
                            };
 var ChannelCopyButtonView = { type : 'ChannelCopyButtonView',
                               model : 'channel',
-                              className : 'TinyButton',
+                              className : 'TinyButton ',
                               events : { 'click' : function (e) {
     return this.channel.trigger('copy-channel', this.channel);
 } },
@@ -391,9 +459,19 @@ var ChannelMonitorView = { type : 'ChannelMonitorView',
     return alert('click');
 } }
                          };
+var ChannelIndexView = { type : 'ChannelIndexView',
+                         model : 'channel',
+                         init : function () {
+    return this.channel.on('change:index', this.render, this);
+},
+                         render : function () {
+    return this.$el.html(hex(this.channel.index()) + ':');
+}
+                       };
 var ChannelTitleView = { type : 'ChannelTitleView',
                          model : 'channel',
-                         init : function (model) {
+                         init : function (model, index) {
+    this.create('indexView', new View(ChannelIndexView, model));
     this.create('leftButton', new View(ChannelMoveLeftButtonView, model));
     this.create('rightButton', new View(ChannelMoveRightButtonView, model));
     this.create('closeButton', new View(ChannelCloseButtonView, model));
@@ -401,7 +479,7 @@ var ChannelTitleView = { type : 'ChannelTitleView',
     return this.create('copyButton', new View(ChannelCopyButtonView, model));
 },
                          render : function () {
-    var html = [this.leftButton().$el, this.rightButton().$el, this.addButton().$el, this.copyButton().$el, this.closeButton().$el];
+    var html = [this.indexView().$el, this.leftButton().$el, this.rightButton().$el, this.addButton().$el, this.copyButton().$el, this.closeButton().$el];
     return this.$el.html(html);
 }
                        };
@@ -602,14 +680,14 @@ var PatternView = { type : 'PatternView',
     return this.create('modeLine', new View(PatternModeLineView, this.pattern));
 },
                     render : function () {
-    var html = [this.editor().$el, this.modeLine().$el];
+    var html = [this.modeLine().$el, this.editor().$el];
     return this.$el.html(html);
 }
                   };
 /* (LOAD song-view.ps) */
 var PatternMoveUpButtonView = { type : 'PatternMoveUpButtonView',
                                 model : 'pattern',
-                                className : 'TinyButton',
+                                className : 'TinyButton ',
                                 events : { 'click' : function (e) {
     return this.pattern.trigger('move-pattern-up', this.pattern);
 } },
@@ -619,7 +697,7 @@ var PatternMoveUpButtonView = { type : 'PatternMoveUpButtonView',
                               };
 var PatternMoveDownButtonView = { type : 'PatternMoveDownButtonView',
                                   model : 'pattern',
-                                  className : 'TinyButton',
+                                  className : 'TinyButton ',
                                   events : { 'click' : function (e) {
     return this.pattern.trigger('move-pattern-down', this.pattern);
 } },
@@ -629,7 +707,7 @@ var PatternMoveDownButtonView = { type : 'PatternMoveDownButtonView',
                                 };
 var PatternAddButtonView = { type : 'PatternAddButtonView',
                              model : 'pattern',
-                             className : 'TinyButton',
+                             className : 'TinyButton ',
                              events : { 'click' : function (e) {
     return this.pattern.trigger('add-pattern', this.pattern);
 } },
@@ -639,7 +717,7 @@ var PatternAddButtonView = { type : 'PatternAddButtonView',
                            };
 var PatternCopyButtonView = { type : 'PatternCopyButtonView',
                               model : 'pattern',
-                              className : 'TinyButton',
+                              className : 'TinyButton ',
                               events : { 'click' : function (e) {
     return this.pattern.trigger('copy-pattern', this.pattern);
 } },
@@ -647,9 +725,19 @@ var PatternCopyButtonView = { type : 'PatternCopyButtonView',
     return this.$el.html('\u2398');
 }
                             };
+var PatternLinkButtonView = { type : 'PatternLinkButtonView',
+                              model : 'pattern',
+                              className : 'TinyButton ',
+                              events : { 'click' : function (e) {
+    return this.pattern.trigger('link-pattern', this.pattern);
+} },
+                              render : function () {
+    return this.$el.html('\u2318');
+}
+                            };
 var PatternCloseButtonView = { type : 'PatternCloseButtonView',
                                model : 'pattern',
-                               className : 'TinyButton',
+                               className : 'TinyButton ',
                                events : { 'click' : function (e) {
     return confirm('Are you sure you want to delete this pattern?') ? this.pattern.trigger('close-pattern', this.pattern) : null;
 } },
@@ -664,21 +752,33 @@ var SongPatternEditSelectButtonsView = { type : 'SongPatternEditSelectButtonsVie
     this.create('downButton', new View(PatternMoveDownButtonView, this.pattern));
     this.create('addButton', new View(PatternAddButtonView, this.pattern));
     this.create('copyButton', new View(PatternCopyButtonView, this.pattern));
+    this.create('linkButton', new View(PatternLinkButtonView, this.pattern));
     return this.create('closeButton', new View(PatternCloseButtonView, this.pattern));
 },
                                          render : function () {
-    var html = [this.upButton().$el, this.downButton().$el, this.addButton().$el, this.copyButton().$el, this.closeButton().$el];
+    var html = [this.upButton().$el, this.downButton().$el, this.addButton().$el, this.copyButton().$el, this.linkButton().$el, this.closeButton().$el];
     return this.$el.html(html);
 }
                                        };
+var SongPatternIndexView = { type : 'SongPatternIndexView',
+                             model : 'pattern',
+                             init : function (model, index) {
+    return this.index = index;
+},
+                             render : function () {
+    return this.$el.html(hex(this.index) + ':');
+}
+                           };
 var SongPatternEditSelectNameView = { type : 'SongPatternEditSelectNameView',
                                       model : 'pattern',
                                       events : { 'click' : function (e) {
     this.trigger('selectPattern', this.pattern);
     return this.select();
 } },
-                                      init : function (model, selected) {
+                                      init : function (model, index, selected) {
     this.create('editView', new View(StringValueEditView, this.pattern, 'SongPatternEditSelectNameView', this.pattern.name, 32));
+    this.create('indexView', new View(SongPatternIndexView, this.pattern, index));
+    this.index = index;
     this.create('buttons', new View(SongPatternEditSelectButtonsView, this.pattern));
     return selected ? this.select() : null;
 },
@@ -689,32 +789,36 @@ var SongPatternEditSelectNameView = { type : 'SongPatternEditSelectNameView',
     return this.$el.removeClass('SongPatternEditSelectNameSelectedView');
 },
                                       render : function () {
-    var html = [this.buttons().$el, this.editView().$el];
+    var html = [this.indexView().$el, this.buttons().$el, this.editView().$el];
     return this.$el.html(html);
 }
                                     };
 var SongPatternEditNameSelectorView = { type : 'SongPatternEditNameSelectorView',
                                         model : 'song',
                                         contains : 'SongPatternEditSelectNameView',
-                                        init : function (model) {
-    var selected = true;
-    this.song.map(function (pattern) {
-        this.add(new View(SongPatternEditSelectNameView, pattern, selected));
-        return selected ? (selected = false) : null;
+                                        rebuildViews : function (selectedIndex) {
+    var current = 0;
+    return this.song.map(function (pattern) {
+        this.add(new View(SongPatternEditSelectNameView, pattern, current, current === selectedIndex), true);
+        return ++current;
     }, this);
+},
+                                        init : function (model) {
+    this.create('currentPattern', this.song.at(0));
+    this.rebuildViews(0);
     this.on('selectPattern', function (e) {
         this.map(function (patternNameView) {
             return patternNameView.deselect();
         });
+        this.currentPattern(e.value);
         return true;
     });
     return this.song.on('modified', function () {
-        this.clear();
-        var selected = true;
-        this.song.map(function (pattern) {
-            this.add(new View(SongPatternEditSelectNameView, pattern, selected));
-            return selected ? (selected = false) : null;
-        }, this);
+        this.clear(true);
+        var patternIndex = this.song.indexOf(this.currentPattern()) || 0;
+        this.currentPattern(this.song.at(patternIndex));
+        this.trigger('selectPattern', this.currentPattern());
+        this.rebuildViews(patternIndex);
         return this.render();
     }, this);
 },
@@ -735,12 +839,89 @@ var SongPatternEditSelectView = { type : 'SongPatternEditSelectView',
     return this.$el.html(html);
 }
                                 };
+var InstrumentSelectView = { type : 'InstrumentSelectView',
+                             model : 'song',
+                             render : function () {
+    return this.$el.html('Instrument');
+}
+                           };
+var SongNameView = { type : 'SongNameView',
+                     model : 'song',
+                     className : 'SongControlsView',
+                     init : function (model) {
+    return this.create('edit', new View(StringValueEditView, this.song, 'SongControlsTitleEditView', this.song.name, 32));
+},
+                     render : function () {
+    var html = ['Title:', this.edit().$el];
+    return this.$el.html(html);
+}
+                   };
+var SongTempoView = { type : 'SongTempoView',
+                      model : 'song',
+                      className : 'SongControlsView',
+                      init : function (model) {
+    return this.create('edit', new View(HexValueEditView, this.song, 'SongControlsEditView', this.song.tempo, null));
+},
+                      render : function () {
+    var html = ['Tempo:', this.edit().$el];
+    return this.$el.html(html);
+}
+                    };
+var SongTpbView = { type : 'SongTpbView',
+                    model : 'song',
+                    className : 'SongControlsView',
+                    init : function (model) {
+    return this.create('edit', new View(HexValueEditView, this.song, 'SongControlsEditView', this.song.ticsPerBeat, null));
+},
+                    render : function () {
+    var html = ['TPB:', this.edit().$el];
+    return this.$el.html(html);
+}
+                  };
+var SongGainView = { type : 'SongGainView',
+                     model : 'song',
+                     className : 'SongControlsView',
+                     init : function (model) {
+    return this.create('edit', new View(HexValueEditView, this.song, 'SongControlsEditView', this.song.gain, null));
+},
+                     render : function () {
+    var html = ['Gain:', this.edit().$el];
+    return this.$el.html(html);
+}
+                   };
+var SongPanView = { type : 'SongPanView',
+                    model : 'song',
+                    className : 'SongControlsView',
+                    init : function (model) {
+    return this.create('edit', new View(HexValueEditView, this.song, 'SongControlsEditView', this.song.pan, null));
+},
+                    render : function () {
+    var html = ['Pan:', this.edit().$el];
+    return this.$el.html(html);
+}
+                  };
+var SongControlsView = { type : 'SongControlsView',
+                         model : 'song',
+                         init : function (mode) {
+    this.create('nameEdit', new View(SongNameView, this.song));
+    this.create('tempoEdit', new View(SongTempoView, this.song));
+    this.create('tpbEdit', new View(SongTpbView, this.song));
+    this.create('gainEdit', new View(SongGainView, this.song));
+    return this.create('panEdit', new View(SongPanView, this.song));
+},
+                         render : function () {
+    var html = [this.gainEdit().$el, this.panEdit().$el, this.tempoEdit().$el, this.tpbEdit().$el, this.nameEdit().$el];
+    return this.$el.html(html);
+}
+                       };
 var SongView = { type : 'SongView',
                  model : 'song',
                  init : function (model) {
     this.create('currentPattern');
     this.create('patternEditor');
     this.create('patternEditSelect', new View(SongPatternEditSelectView, this.song));
+    this.create('instrumentSelect', new View(InstrumentSelectView, this.song));
+    this.create('songControls', new View(SongControlsView, this.song));
     this.on('change:currentPattern', function (e) {
         this.set('patternEditor', new View(PatternView, this.currentPattern()));
         return this.render();
@@ -751,7 +932,7 @@ var SongView = { type : 'SongView',
     });
 },
                  render : function () {
-    var html = [this.patternEditSelect().$el, this.patternEditor().$el];
+    var html = [this.songControls().$el, this.patternEditSelect().$el, this.patternEditor().$el, this.instrumentSelect().$el];
     return this.$el.html(html);
 }
                };
