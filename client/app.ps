@@ -2,8 +2,9 @@
 (load "macros.ps")
 (load "utils.ps")
 
-(defvar default-num-channels 8)
+(defvar default-num-channels 4)
 (defvar default-pattern-size 16)
+(defvar default-num-patterns 4)
 
 (defmodel *Note
     init (lambda (instrument pitch fx arg)
@@ -86,10 +87,33 @@
 
 (defcontainer *Song *Pattern
   init (lambda (name size)
-         (this.create 'size (or size 8))
+         (this.create 'size (or size default-num-patterns))
          (this.create 'name (or name index))
          (dotimes (i ((@ this size)))
-           (this.add (new (*Class *Pattern i))))))
+           (this.add (new (*Class *Pattern i))))
+
+         (this.on :close-pattern
+                  (lambda (e)
+                    (this.remove e.value)))
+         (this.on :add-pattern
+                  (lambda (e)
+                    (let ((i ((@ this index-of) e.value)))
+                      ((@ this insert-at) (1+ i) (new (*Class *Pattern "--"))))))
+         (this.on :copy-pattern
+                  (lambda (e)
+                    (let ((i ((@ this index-of) e.value)))
+                      ((@ this insert-at) (1+ i) (e.value.copy)))))
+         (this.on :move-pattern-up
+                  (lambda (e)
+                    (let ((i ((@ this index-of) e.value)))
+                      (if (> i 0)
+                          (this.swap i (1- i))))))
+         (this.on :move-pattern-down
+                  (lambda (e)
+                    (let ((i ((@ this index-of) e.value)))
+                      (if (< i (- this.length 1))
+                          (this.swap i (1+ i))))))
+         ))
 
 (defcontainer *App *Song
   init (lambda (name)

@@ -11,10 +11,12 @@ function hex(x, len) {
         };
     })() : null, s));
 };
-/* (DEFVAR DEFAULT-NUM-CHANNELS 8) */
-var defaultNumChannels = 8;
+/* (DEFVAR DEFAULT-NUM-CHANNELS 4) */
+var defaultNumChannels = 4;
 /* (DEFVAR DEFAULT-PATTERN-SIZE 16) */
 var defaultPatternSize = 16;
+/* (DEFVAR DEFAULT-NUM-PATTERNS 4) */
+var defaultNumPatterns = 4;
 /* (DEFMODEL *NOTE INIT
     (LAMBDA (INSTRUMENT PITCH FX ARG)
       (THIS.CREATE INSTRUMENT INSTRUMENT)
@@ -163,17 +165,55 @@ var Pattern = { type : 'Pattern',
               };
 /* (DEFCONTAINER *SONG *PATTERN INIT
     (LAMBDA (NAME SIZE)
-      (THIS.CREATE 'SIZE (OR SIZE 8))
+      (THIS.CREATE 'SIZE (OR SIZE DEFAULT-NUM-PATTERNS))
       (THIS.CREATE 'NAME (OR NAME INDEX))
-      (DOTIMES (I ((@ THIS SIZE))) (THIS.ADD (NEW (*CLASS *PATTERN I)))))) */
+      (DOTIMES (I ((@ THIS SIZE))) (THIS.ADD (NEW (*CLASS *PATTERN I))))
+      (THIS.ON CLOSE-PATTERN (LAMBDA (E) (THIS.REMOVE E.VALUE)))
+      (THIS.ON ADD-PATTERN
+       (LAMBDA (E)
+         (LET ((I ((@ THIS INDEX-OF) E.VALUE)))
+           ((@ THIS INSERT-AT) (1+ I) (NEW (*CLASS *PATTERN --))))))
+      (THIS.ON COPY-PATTERN
+       (LAMBDA (E)
+         (LET ((I ((@ THIS INDEX-OF) E.VALUE)))
+           ((@ THIS INSERT-AT) (1+ I) (E.VALUE.COPY)))))
+      (THIS.ON MOVE-PATTERN-UP
+       (LAMBDA (E)
+         (LET ((I ((@ THIS INDEX-OF) E.VALUE)))
+           (IF (> I 0)
+               (THIS.SWAP I (1- I))))))
+      (THIS.ON MOVE-PATTERN-DOWN
+       (LAMBDA (E)
+         (LET ((I ((@ THIS INDEX-OF) E.VALUE)))
+           (IF (< I (- THIS.LENGTH 1))
+               (THIS.SWAP I (1+ I)))))))) */
 var Song = { type : 'Song',
              contains : 'Pattern',
              init : function (name, size) {
-    this.create('size', size || 8);
+    this.create('size', size || defaultNumPatterns);
     this.create('name', name || index);
     for (var i = 0; i < this.size(); i += 1) {
         this.add(new Class(Pattern, i));
     };
+    this.on('close-pattern', function (e) {
+        return this.remove(e.value);
+    });
+    this.on('add-pattern', function (e) {
+        var i = this.indexOf(e.value);
+        return this.insertAt(i + 1, new Class(Pattern, '--'));
+    });
+    this.on('copy-pattern', function (e) {
+        var i = this.indexOf(e.value);
+        return this.insertAt(i + 1, e.value.copy());
+    });
+    this.on('move-pattern-up', function (e) {
+        var i = this.indexOf(e.value);
+        return i > 0 ? this.swap(i, i - 1) : null;
+    });
+    return this.on('move-pattern-down', function (e) {
+        var i = this.indexOf(e.value);
+        return i < this.length - 1 ? this.swap(i, i + 1) : null;
+    });
 }
            };
 /* (DEFCONTAINER *APP *SONG INIT
@@ -567,6 +607,70 @@ var PatternView = { type : 'PatternView',
 }
                   };
 /* (LOAD song-view.ps) */
+var PatternMoveUpButtonView = { type : 'PatternMoveUpButtonView',
+                                model : 'pattern',
+                                className : 'TinyButton',
+                                events : { 'click' : function (e) {
+    return this.pattern.trigger('move-pattern-up', this.pattern);
+} },
+                                render : function () {
+    return this.$el.html('\u2191');
+}
+                              };
+var PatternMoveDownButtonView = { type : 'PatternMoveDownButtonView',
+                                  model : 'pattern',
+                                  className : 'TinyButton',
+                                  events : { 'click' : function (e) {
+    return this.pattern.trigger('move-pattern-down', this.pattern);
+} },
+                                  render : function () {
+    return this.$el.html('\u2193');
+}
+                                };
+var PatternAddButtonView = { type : 'PatternAddButtonView',
+                             model : 'pattern',
+                             className : 'TinyButton',
+                             events : { 'click' : function (e) {
+    return this.pattern.trigger('add-pattern', this.pattern);
+} },
+                             render : function () {
+    return this.$el.html('+');
+}
+                           };
+var PatternCopyButtonView = { type : 'PatternCopyButtonView',
+                              model : 'pattern',
+                              className : 'TinyButton',
+                              events : { 'click' : function (e) {
+    return this.pattern.trigger('copy-pattern', this.pattern);
+} },
+                              render : function () {
+    return this.$el.html('\u2398');
+}
+                            };
+var PatternCloseButtonView = { type : 'PatternCloseButtonView',
+                               model : 'pattern',
+                               className : 'TinyButton',
+                               events : { 'click' : function (e) {
+    return confirm('Are you sure you want to delete this pattern?') ? this.pattern.trigger('close-pattern', this.pattern) : null;
+} },
+                               render : function () {
+    return this.$el.html('\u2717');
+}
+                             };
+var SongPatternEditSelectButtonsView = { type : 'SongPatternEditSelectButtonsView',
+                                         model : 'pattern',
+                                         init : function (model) {
+    this.create('upButton', new View(PatternMoveUpButtonView, this.pattern));
+    this.create('downButton', new View(PatternMoveDownButtonView, this.pattern));
+    this.create('addButton', new View(PatternAddButtonView, this.pattern));
+    this.create('copyButton', new View(PatternCopyButtonView, this.pattern));
+    return this.create('closeButton', new View(PatternCloseButtonView, this.pattern));
+},
+                                         render : function () {
+    var html = [this.upButton().$el, this.downButton().$el, this.addButton().$el, this.copyButton().$el, this.closeButton().$el];
+    return this.$el.html(html);
+}
+                                       };
 var SongPatternEditSelectNameView = { type : 'SongPatternEditSelectNameView',
                                       model : 'pattern',
                                       events : { 'click' : function (e) {
@@ -574,7 +678,8 @@ var SongPatternEditSelectNameView = { type : 'SongPatternEditSelectNameView',
     return this.select();
 } },
                                       init : function (model, selected) {
-    this.create('editView', new View(StringValueEditView, this.pattern, 'SongPatternEditSelectNameView', this.pattern.name, 12));
+    this.create('editView', new View(StringValueEditView, this.pattern, 'SongPatternEditSelectNameView', this.pattern.name, 32));
+    this.create('buttons', new View(SongPatternEditSelectButtonsView, this.pattern));
     return selected ? this.select() : null;
 },
                                       select : function () {
@@ -584,7 +689,8 @@ var SongPatternEditSelectNameView = { type : 'SongPatternEditSelectNameView',
     return this.$el.removeClass('SongPatternEditSelectNameSelectedView');
 },
                                       render : function () {
-    return this.$el.html(this.editView().$el);
+    var html = [this.buttons().$el, this.editView().$el];
+    return this.$el.html(html);
 }
                                     };
 var SongPatternEditNameSelectorView = { type : 'SongPatternEditNameSelectorView',
@@ -596,12 +702,21 @@ var SongPatternEditNameSelectorView = { type : 'SongPatternEditNameSelectorView'
         this.add(new View(SongPatternEditSelectNameView, pattern, selected));
         return selected ? (selected = false) : null;
     }, this);
-    return this.on('selectPattern', function (e) {
+    this.on('selectPattern', function (e) {
         this.map(function (patternNameView) {
             return patternNameView.deselect();
         });
         return true;
     });
+    return this.song.on('modified', function () {
+        this.clear();
+        var selected = true;
+        this.song.map(function (pattern) {
+            this.add(new View(SongPatternEditSelectNameView, pattern, selected));
+            return selected ? (selected = false) : null;
+        }, this);
+        return this.render();
+    }, this);
 },
                                         render : function () {
     var html = this.map(function (nameView) {

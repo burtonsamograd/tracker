@@ -70,37 +70,48 @@ input[type=text] {
 }
 
 .PatternView {
+    display: table-cell;
     border: 1px solid;
+    overflow: auto;
 }
 
 .SongView {
-    white-space: nowrap;
+    display: table-row
 }
 
 .SongPatternEditSelectView {
+    vertical-align: top;
+    display: table-cell;
     border: solid 2px;
     padding: .25em;
-    width: 12em;
-    display: inline-block;
 }
 
 .SongPatternEditNameSelectorView {
-    height: 5.5em;
-    overflow: auto;
+    padding: .25em;
+    width: 12em;
+    border: 1px solid;
 }
+
+.SongPatternEditSelectNameView {
+    padding: .1em;
+}
+
 .SongPatternEditSelectNameSelectedView {
     background-color: orange;
 }
 
+.SongPatternEditSelectButtonsView {
+    float: right;
+}
+
 .PatternView {
-    border: 1px solid red;
+    width: 100%;
 }
 
 .PatternEditView {
-    border: 1px solid;
     overflow: auto;
     overflow-y: hidden;
-    white-space: nowrap;
+    border: 1px solid;
 }
 
 .PatternModeLineView {
@@ -186,7 +197,6 @@ input[type=text] {
 }
 
 .AppView {
-    border: 4px solid;
-    width: 99%;
     margin: auto;
 }
+
