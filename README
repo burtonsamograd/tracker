@@ -9,9 +9,9 @@ along with the basic idea of loading samples and instruments.  Double
 click fields to edit them; double click a sample name to load it as an
 instrument.
 
-THIS DOES NOT PRODUCE SOUND, it was done as a proof of concept and bug
-fixing journey for PX2 and Parenscript, but then I ran into some sort
-of bug in the PS compiler and it took the wind out of my sails.
+THIS DOES NOT PRODUCE SOUND, it was done as a UI proof of concept and
+bug fixing journey for PX2 and Parenscript, but then I ran into some
+sort of bug in the PS compiler and it took the wind out of my sails.
 
 [1] https://en.wikipedia.org/wiki/Music_tracker
 [2] https://github.com/burtonsamograd/px2, https://www.npmjs.com/package/px2
