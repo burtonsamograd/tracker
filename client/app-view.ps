@@ -1,0 +1,25 @@
+;; -*- mode: lisp -*-
+(load "macros.ps")
+
+(defview *Minibuffer-view
+    model "app"
+    render (lambda ()
+             ((@ this $el html) "<input class='MinibufferEditorView' type='text'>")))
+
+(defview *App-view
+    model "app"
+    contains '*Song-view
+    init (lambda (model)
+           (this.create 'minibuffer (new (*View *Minibuffer-view this.app)))
+           (this.create 'tools (new (*View *Tools-view this.app)))
+           (this.create 'song (new (*View *Song-view ((@ this app song)))))
+           (this.on :load-sample (lambda (e)
+                                   ((@ ((@ this song)) load-sample) e.value)))
+           )
+    render (lambda ()
+             (let ((html (array
+                          (@ ((@ this song)) $el)
+                          (@ ((@ this tools)) $el)
+                          (@ ((@ this minibuffer)) $el))))
+               ((@ this $el html) html))))
+

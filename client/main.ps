@@ -1,0 +1,35 @@
+;; -*- mode: lisp -*-
+(load "macros.ps")
+
+(defmodel *Options
+    defaults (create
+              default-song-name "untitled"
+              default-pattern-name "Pattern"
+              default-channel-name "Channel"
+              default-num-channels 4
+              default-pattern-size 16
+              default-num-patterns 4
+              default-tempo 0x80
+              default-tics-per-beat 6
+              default-gain 0x80
+              default-pan 0x80
+              user-name "Dave"
+              confirm true))
+
+(defvar options (new (*Class *Options)))
+(defvar app (new (*Class *App)))
+
+((@ ($ document) ready)
+ (lambda ()
+   (let ((app-view (new (*View *App-view app))))
+     ((@ ($ document) bind) 'dblclick (lambda (e)
+                                     ((@ e prevent-default))))
+     ((@ ($ document) bind) 'click (lambda (e)
+                                     (unless (or (= (@ e target tag-name) "INPUT")
+                                                 (= (@ e target tag-name) "TEXTAREA"))
+                                       ((@ ($ ".MinibufferEditorView") select)))))
+     ((@ ($ 'body) html) (@ app-view $el))
+     )))
+;     ((@ ($ document) bind) 'keydown (lambda (e)
+;                                       (console.log (@ e char-code))))
+   
