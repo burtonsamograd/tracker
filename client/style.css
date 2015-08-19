@@ -151,7 +151,7 @@ input[type=text] {
 .TinyButton {
     font-family: FontAwesome;
     font-size: x-small;
-    padding: .25em;
+    padding: .15em;
     text-align: center;
     display: inline-block;
 }
