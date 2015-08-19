@@ -1,2 +1,3 @@
 client/*.js
 client/index.html
+client/style.min.css

@@ -5,7 +5,7 @@
 (defview *Hex-value-edit-view
     init (lambda (model class-name model-value-fn width)
            (setf (@ this model-value-fn) model-value-fn)
-           (setf (@ this class-name) class-name)
+           (setf (@ this class-name) (+ class-name " EditView"))
            (setf this.width (or width 2))
            (setf (@ this placeholder) "-")
            (dotimes (i (1- (@ this width))) ;; TODO: could share these strings between instances
@@ -58,7 +58,7 @@
 (defview *String-value-edit-view
     init (lambda (model class-name model-value-fn width)
            (setf (@ this model-value-fn) model-value-fn)
-           (setf (@ this class-name) class-name)
+           (setf (@ this class-name) (+ class-name " EditView"))
            (setf this.width (or width 8))
            (this.model.on 'change (@ this end-edit) this)
            ((@ this end-edit))

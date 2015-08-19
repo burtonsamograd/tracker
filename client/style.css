@@ -151,11 +151,17 @@ input[type=text] {
 .TinyButton {
     font-family: FontAwesome;
     font-size: x-small;
-    font-weight: bold;
-    padding-right: .25em;
-    padding-left: .2em;
+    padding: .25em;
     text-align: center;
     display: inline-block;
+}
+
+.TinyButton:hover {
+    background: yellow;
+}
+
+.EditView:hover {
+    background: yellow;
 }
 
 .Button {
@@ -206,8 +212,7 @@ input[type=text] {
 }
 
 .ChannelCloseButton {
-    padding-left:  1em;
-    padding-right:  .3em;
+    float: right;
 }
 
 .NoteViewHighlight {
@@ -240,7 +245,6 @@ input[type=text] {
 
 .PatternCloseButton:before {
     content: "\f00d";
-    padding-left: .5em;
 }
 
 .PatternPlayButton:before {
