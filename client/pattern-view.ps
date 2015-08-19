@@ -1,4 +1,5 @@
 ;; -*- mode: lisp -*-
+(load "macros.ps")
 
 (defview *Pattern-edit-view
     model "pattern"
@@ -69,8 +70,8 @@
                              (lambda (channel-view)
                                (@ channel-view $el))))))
 
-(deftiny-button-view *Pattern-play-button-view "↓" 'pattern 'play)
-(deftiny-button-view *Pattern-loop-button-view "↕" 'pattern 'loop)
+(deftiny-button-view *Pattern-play-button-view 'pattern 'play :class-name "PatternPlayButton")
+(deftiny-button-view *Pattern-loop-button-view 'pattern 'loop :class-name "PatternLoopButton")
 
 (defview *Pattern-name-view
     model "pattern"

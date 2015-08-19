@@ -149,6 +149,9 @@ input[type=text] {
 }
 
 .TinyButton {
+    font-family: FontAwesome;
+    font-size: x-small;
+    font-weight: bold;
     padding-right: .25em;
     padding-left: .2em;
     text-align: center;
@@ -178,13 +181,33 @@ input[type=text] {
     text-align: center;
 }
 
-.ChannelCloseButton {
-    float: right;
-    padding-right:  .3em;
-}
-
 .ChannelTitleView {
     border: 1px solid;
+}
+
+.ChannelLeftButton:before {
+    content: "\f060";
+}
+
+.ChannelRightButton:before {
+    content: "\f061";
+}
+
+.ChannelAddButton:before {
+    content: "\f067";
+}
+
+.ChannelCopyButton:before {
+    content: "\f0c5";
+}
+
+.ChannelCloseButton:before {
+    content: "\f00d";
+}
+
+.ChannelCloseButton {
+    padding-left:  1em;
+    padding-right:  .3em;
 }
 
 .NoteViewHighlight {
@@ -193,6 +216,39 @@ input[type=text] {
 
 .NoteViewSelected {
     background-color: green;
+}
+
+.PatternUpButton:before {
+    content: "\f062";
+}
+
+.PatternDownButton:before {
+    content: "\f063";
+}
+
+.PatternAddButton:before {
+    content: "\f067";
+}
+
+.PatternCopyButton:before {
+    content: "\f0c5";
+}
+
+.PatternLinkButton:before {
+    content: "\f0c1";
+}
+
+.PatternCloseButton:before {
+    content: "\f00d";
+    padding-left: .5em;
+}
+
+.PatternPlayButton:before {
+    content: "\f04b";
+}
+
+.PatternLoopButton:before {
+    content: "\f1ce";
 }
 
 .NotePitchView {

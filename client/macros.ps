@@ -19,7 +19,7 @@
       type ',name
       ,@body)))
 
-(defmacro deftiny-button-view (name character model message
+(defmacro deftiny-button-view (name model message
                                &key confirm-message (class-name ""))
   (let ((click-fn (if confirm-message
                       `(lambda (e)
@@ -34,9 +34,7 @@
        model ,model
        class-name ,class-name
        events (create
-               'click ,click-fn)
-       render (lambda ()
-                (this.$el.html ,character)))))
+               'click ,click-fn))))
 
 (defmacro deftext-edit-view (name model class-name edit-view-class-name
                              edit-view text change-fn &optional length)

@@ -1,10 +1,16 @@
 ;; -*- mode: lisp -*-
+(load "macros.ps")
+(load "utils.ps")
 
-(deftiny-button-view *Channel-move-left-button-view "←" 'channel :move-channel-left)
-(deftiny-button-view *Channel-move-right-button-view "→" 'channel :move-channel-right)
-(deftiny-button-view *Channel-add-button-view "+" 'channel :add-channel)
-(deftiny-button-view *Channel-copy-button-view "⎘" 'channel :copy-channel)
-(deftiny-button-view *Channel-close-button-view "✗" 'channel :close-channel
+(deftiny-button-view *Channel-move-left-button-view 'channel :move-channel-left
+                     :class-name "ChannelLeftButton")
+(deftiny-button-view *Channel-move-right-button-view 'channel :move-channel-right
+                     :class-name "ChannelRightButton")
+(deftiny-button-view *Channel-add-button-view 'channel :add-channel
+                     :class-name "ChanneAddButton")
+(deftiny-button-view *Channel-copy-button-view 'channel :copy-channel
+                     :class-name "ChannelCopyButton")
+(deftiny-button-view *Channel-close-button-view 'channel :close-channel
                      :confirm-message (+ ((@ options user-name))
                                          ", are you sure you want to delete this channel?")
                      :class-name "ChannelCloseButton")
